@@ -8,6 +8,17 @@ Tetris implemented in Rust
   in its new orientation, it does not rotate. Some games tolerate "wall kicks"
   or "wall nudges"
 
+## Point system
+Points are handed out when lines are removed:
+
+```
+Single line: 1 p
+Double line: 3 p
+Triple line: 8 p
+Tetris:      20 p
+```
+
+
 ## Cheat-Sheet
 
 ### Wall:
