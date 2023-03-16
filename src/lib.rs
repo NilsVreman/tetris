@@ -1,7 +1,10 @@
 #![allow(dead_code, unused_variables)]
 
-mod board_utils;
+mod board_util;
 
-pub mod blocks;
+mod block;
 
-pub mod board;
+mod board;
+
+pub use board::Board;
+pub use block::BlockGenerator;
