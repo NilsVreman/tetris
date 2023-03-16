@@ -1,9 +1,11 @@
 use tetris;
 
 pub fn main() {
-    println!("Hello, World!");
-
-    for block in tetris::blocks::BLOCKS {
+    let bg = tetris::blocks::BlockGenerator::new();
+    for block in bg {
         println!("{}\n", block);
     }
+
+    let board = tetris::board::Board::new();
+    println!("{}", board);
 }

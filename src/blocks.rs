@@ -1,113 +1,79 @@
 use std::fmt;
 
+use crate::board_utils::u16_to_string;
+
+#[derive(Copy, Clone)]
 enum BlockType {
-    I,
-    J,
-    L,
-    O,
-    S,
-    T,
-    Z,
+    I, J, L, O, S, T, Z,
 }
 
-pub struct Block {
-    lines: u64,
+#[derive(Copy, Clone)]
+pub struct Block<'a> {
+    lines: &'a [u16],  // Definitely possible to do this with u64, but a bit more convoluted
     blocktype: BlockType,
 }
 
-impl fmt::Display for Block {
+impl<'a> fmt::Display for Block<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut s = String::new();
-        (0..64).rev().for_each(|i| {
-            s.push_str(&format!("{}", if self.lines & (1 << i) != 0 { 1 } else { 0 })[..]);
-            if i % 16 == 0 && i != 0 {
-                s.push_str("\n");
-            }
-        });
-        write!(f, "{}", s)
+        write!(f, "{}\n{}\n{}\n{}",
+               u16_to_string(self.lines[0]),
+               u16_to_string(self.lines[1]),
+               u16_to_string(self.lines[2]),
+               u16_to_string(self.lines[3]))
     }
 }
 
-impl Block {
-    
+impl<'a> Block<'a> {
+    fn new(bt: BlockType) -> Self {
+        Self {
+            lines: match bt {
+                BlockType::I => &[0x0000, 0x0000, 0x0000, 0x03C0],
+                BlockType::J => &[0x0000, 0x0000, 0x0200, 0x0380],
+                BlockType::L => &[0x0000, 0x0000, 0x0080, 0x0380],
+                BlockType::O => &[0x0000, 0x0000, 0x0180, 0x0180],
+                BlockType::S => &[0x0000, 0x0000, 0x0180, 0x0300],
+                BlockType::T => &[0x0000, 0x0000, 0x0100, 0x0380],
+                BlockType::Z => &[0x0000, 0x0000, 0x0300, 0x0180],
+            },
+            blocktype: bt
+        }
+    }
 }
 
-pub const BLOCKS: [Block; 7] = [
-    Block {
-        lines: 0x00000000000003C0,
-        blocktype: BlockType::I,
-    },
-    Block {
-        lines: 0x0000000002000380,
-        blocktype: BlockType::J,
-    },
-    Block {
-        lines: 0x0000000000800380,
-        blocktype: BlockType::L,
-    },
-    Block {
-        lines: 0x0000000001800180,
-        blocktype: BlockType::O,
-    },
-    Block {
-        lines: 0x0000000001800300,
-        blocktype: BlockType::S,
-    },
-    Block {
-        lines: 0x0000000001000380,
-        blocktype: BlockType::T,
-    },
-    Block {
-        lines: 0x0000000003000180,
-        blocktype: BlockType::Z,
-    },
-];
+pub struct BlockGenerator<'a> {
+    blocktypes: &'a [BlockType],
+    nextidx: usize,
+    thisidx: usize,
+}
 
-// Cheat-Sheet
-// Wall: 0x3003300330033003
-// 0010 0000 0000 0100
-// 0010 0000 0000 0100
-// 0010 0000 0000 0100
-// 0010 0000 0000 0100
-//
-// I-Block: 0x00000000000003A0
-// 0000 0000 0000 0000
-// 0000 0000 0000 0000
-// 0000 0000 0000 0000
-// 0000 0011 1100 0000
-//
-// J-Block: 0x0000000002000360
-// 0000 0000 0000 0000
-// 0000 0000 0000 0000
-// 0000 0010 0000 0000
-// 0000 0011 1000 0000
-//
-// L-Block: 0x0000000000600360
-// 0000 0000 0000 0000
-// 0000 0000 0000 0000
-// 0000 0000 1000 0000
-// 0000 0011 1000 0000
-//
-// O-Block: 0x0000000001600160
-// 0000 0000 0000 0000
-// 0000 0000 0000 0000
-// 0000 0001 1000 0000
-// 0000 0001 1000 0000
-//
-// S-Block: 0x0000000001600300
-// 0000 0000 0000 0000
-// 0000 0000 0000 0000
-// 0000 0001 1000 0000
-// 0000 0011 0000 0000
-//
-// T-Block: 0x0000000001000360
-// 0000 0000 0000 0000
-// 0000 0000 0000 0000
-// 0000 0001 0000 0000
-// 0000 0011 1000 0000
-//
-// Z-Block: 0x0000000003000160
-// 0000 0000 0000 0000
-// 0000 0000 0000 0000
-// 0000 0011 0000 0000
-// 0000 0001 1000 0000
+impl<'a> BlockGenerator<'a> {
+    pub fn new() -> Self {
+        Self {
+            blocktypes: &[
+                BlockType::I,
+                BlockType::J,
+                BlockType::L,
+                BlockType::O,
+                BlockType::S,
+                BlockType::T,
+                BlockType::Z,
+            ],
+            nextidx: 1,
+            thisidx: 0,
+        }
+    }
+}
+
+impl<'a> Iterator for BlockGenerator<'a> {
+    type Item = Block<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.blocktypes.len() <= self.thisidx {
+            return None;
+        }
+        let ele = Block::new(self.blocktypes[self.thisidx]);
+        self.thisidx = self.nextidx;
+        self.nextidx += 1;
+        return Some(ele);
+    }
+}
