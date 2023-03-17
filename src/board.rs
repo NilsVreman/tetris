@@ -21,12 +21,7 @@ pub struct Board {
 
 impl fmt::Display for Board {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut s = String::new();
-        for &line in self.state.iter().rev().skip(BOARD_HEIGHT.checked_sub(FAIL_HEIGHT+1).unwrap()) {
-            s.push_str(&u16_to_string(line)[..]);
-            s.push_str("\n");
-        }
-        s.push_str(&format!("  {}  ", "#".repeat(12))[..]);
+        let s = self.print_block_on_board(|x| &0);
         write!(f, "{}", s)
     }
 }
@@ -68,6 +63,23 @@ impl Board {
             n += if self.line_is_full(idx+i) { 1 } else { 0 };
         }
         return if self.state[FAIL_HEIGHT] == WALLS { BoardStatus::Okay(n) } else { BoardStatus::Overflow(n) } 
+    }
+
+    /// Prints the block with the corresponding state of the board
+    pub fn print_block_on_board<'a, F>(&self, block_fn: F) -> String 
+    where
+        F: Fn(usize) -> &'a u16,
+    {
+        let mut s = String::new();
+        for (i, &line) in self.state.iter()
+                .enumerate()
+                .rev()
+                .skip(BOARD_HEIGHT - FAIL_HEIGHT - 1) {
+            s.push_str( &u16_to_string( line | block_fn(i) )[..] );
+            s.push_str("\n");
+        }
+        s.push_str(&format!("  {}  ", "#".repeat(12))[..]);
+        s
     }
 
     // Checks whether line is full or not
