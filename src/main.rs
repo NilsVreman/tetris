@@ -1,14 +1,16 @@
 pub fn main() {
-    let mut board = tetris::Board::new();
+    //let mut board = tetris::Board::new();
 
-    let bg = tetris::BlockGenerator::new();
-    for (idx, block) in bg.enumerate() {
-        board.add_block(idx*2, &block);
-    }
+    //let bg = tetris::BlockGenerator::new();
+    //for (idx, block) in bg.enumerate() {
+    //    board.add_block(idx*2, &block);
+    //}
 
-    println!("{}", board);
+    //println!("{}", board);
 
-    board.clear_line(1);
+    //board.clear_line(1);
 
-    println!("\n\n{}", board);
+    //println!("\n\n{}", board);
+    let mut tetris = tetris::TetrisGame::new();
+    tetris.run();
 }

@@ -1,6 +1,8 @@
 use std::fmt;
 
-use crate::board_util::u16_to_string;
+use crate::{
+    game_util::u16_to_string,
+};
 
 #[derive(Copy, Clone)]
 enum BlockType {
@@ -27,13 +29,13 @@ impl Block {
     fn new(bt: &BlockType) -> Self {
         Self {
             lines: match bt {
-                BlockType::I => [0x03C0, 0x0000, 0x0000, 0x0000],
-                BlockType::J => [0x0380, 0x0200, 0x0000, 0x0000],
-                BlockType::L => [0x0380, 0x0080, 0x0000, 0x0000],
-                BlockType::O => [0x0180, 0x0180, 0x0000, 0x0000],
-                BlockType::S => [0x0300, 0x0180, 0x0000, 0x0000],
-                BlockType::T => [0x0380, 0x0100, 0x0000, 0x0000],
-                BlockType::Z => [0x0180, 0x0300, 0x0000, 0x0000],
+                BlockType::I => [0x03C0, 0x0000, 0x0000, 0x0000],  // NOTE: index 0 is bottom row
+                BlockType::J => [0x0380, 0x0200, 0x0000, 0x0000],  // NOTE: index 0 is bottom row
+                BlockType::L => [0x0380, 0x0080, 0x0000, 0x0000],  // NOTE: index 0 is bottom row
+                BlockType::O => [0x0180, 0x0180, 0x0000, 0x0000],  // NOTE: index 0 is bottom row
+                BlockType::S => [0x0300, 0x0180, 0x0000, 0x0000],  // NOTE: index 0 is bottom row
+                BlockType::T => [0x0380, 0x0100, 0x0000, 0x0000],  // NOTE: index 0 is bottom row
+                BlockType::Z => [0x0180, 0x0300, 0x0000, 0x0000],  // NOTE: index 0 is bottom row
             },
             blocktype: *bt
         }
@@ -46,12 +48,17 @@ impl Block {
 
 pub struct BlockGenerator<'a> {
     blocktypes: &'a [BlockType],
+    fn_next: Box<dyn Fn(&usize) -> usize>,
     nextidx: usize,
     thisidx: usize,
 }
 
 impl<'a> BlockGenerator<'a> {
-    pub fn new() -> Self {
+    /// return a blockgenerator which generates the next block based on rule from closure f
+    pub fn new<F>(f: F) -> Self
+    where
+        F: Fn(&usize) -> usize + 'static,
+    {
         Self {
             blocktypes: &[
                 BlockType::I,
@@ -62,9 +69,17 @@ impl<'a> BlockGenerator<'a> {
                 BlockType::T,
                 BlockType::Z,
             ],
-            nextidx: 1,
             thisidx: 0,
+            nextidx: f(&0),
+            fn_next: Box::new(f),
         }
+    }
+
+    pub fn peek_next(&self) -> Option<Block> {
+        if self.nextidx >= self.blocktypes.len() {
+            return None;
+        }
+        return Some(Block::new(&self.blocktypes[self.nextidx]));
     }
 }
 
@@ -72,12 +87,12 @@ impl<'a> Iterator for BlockGenerator<'a> {
     type Item = Block;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.blocktypes.len() <= self.thisidx {
+        if self.thisidx >= self.blocktypes.len() {
             return None;
         }
         let ele = Block::new(&self.blocktypes[self.thisidx]);
         self.thisidx = self.nextidx;
-        self.nextidx += 1;
+        self.nextidx = (self.fn_next)(&self.thisidx);
         return Some(ele);
     }
 }

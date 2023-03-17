@@ -1,10 +1,11 @@
 #![allow(dead_code, unused_variables)]
 
-mod board_util;
-
+mod game_util;
+mod rules;
 mod block;
-
 mod board;
+mod scoreboard;
+mod worker;
+mod game;
 
-pub use board::Board;
-pub use block::BlockGenerator;
+pub use game::TetrisGame;

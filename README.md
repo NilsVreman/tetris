@@ -14,8 +14,8 @@ Points are handed out when lines are removed:
 ```
 Single line: 1 p
 Double line: 3 p
-Triple line: 8 p
-Tetris:      20 p
+Triple line: 7 p
+Tetris:      13 p
 ```
 
 
