@@ -40,7 +40,7 @@ impl Board {
     /// block: The block to check
     ///
     /// returns feasibility certificate
-    pub fn is_feasible(&self, idx: usize, block: &Block) -> bool {
+    pub fn is_feasible(&self, idx: usize, block: &Box<dyn Block>) -> bool {
         let lines = block.config();
         if idx+3 >= BOARD_HEIGHT { return false }
         return self.state[idx] & lines[0] == 0 &&
@@ -55,7 +55,7 @@ impl Board {
     /// block: The block to add
     ///
     /// returns an Option: Some(the number of lines to clear), or None if we have failed
-    pub fn add_block(&mut self, idx: usize, block: &Block) -> BoardStatus {
+    pub fn add_block(&mut self, idx: usize, block: &Box<dyn Block>) -> BoardStatus {
         let lines = block.config();
         let mut n = 0;
         for i in 0..4 {

@@ -4,24 +4,38 @@ use std::{
 };
 
 use crate::{
-    game_util::{UPDATE_FREQ, MAX_GRAVITY, FAIL_HEIGHT},
     board,
     block,
     scoreboard,
     rules,
     worker,
 };
+use crate::game_util::{
+    UPDATE_FREQ,
+    MAX_GRAVITY,
+    FAIL_HEIGHT,
+    ShiftCmd,
+    RotateCmd,
+};
 
-
-pub struct TetrisGame<'a> {
+pub struct TetrisGame {
     board: board::Board,
-    blockgenerator: block::BlockGenerator<'a>,
+    blockgenerator: block::BlockGenerator,
     score: scoreboard::Scoreboard,
     workers: Vec<worker::Worker>,
     gravity: f32,
 }
 
-impl<'a> TetrisGame<'a> {
+impl Drop for TetrisGame {
+    fn drop(&mut self) {
+        for worker in &mut self.workers {
+            println!("Shutting down worker");
+            worker.join();
+        }
+    }
+}
+
+impl TetrisGame {
     pub fn new() -> Self {
         Self { 
             board: board::Board::new(),
@@ -59,8 +73,8 @@ impl<'a> TetrisGame<'a> {
 
             if time_idx == 0 {
                 time_idx = time_idx_fn(self.gravity);
-                if line_idx == 0 || !self.board.is_feasible(line_idx - 1, &cur_block.unwrap()) {
-                    let status = self.board.add_block(line_idx, &cur_block.unwrap());
+                if line_idx == 0 || !self.board.is_feasible(line_idx - 1, cur_block.as_ref().unwrap()) {
+                    let status = self.board.add_block(line_idx, cur_block.as_ref().unwrap());
                     if let board::BoardStatus::Overflow(n) = status {
                         executing = false; // TODO: Fix
                     }
@@ -68,13 +82,17 @@ impl<'a> TetrisGame<'a> {
                     line_idx = FAIL_HEIGHT;
                 } else {
                     line_idx -= 1;
+                    // TODO: Remove //
+                    if line_idx % 7 == 0 {
+                        cur_block.as_mut().unwrap().shift(&ShiftCmd::Right);
+                    }
                 }
             }
 
             println!("{}\n",
-                     self.board.print_block_on_board(
-                         rules::rule_blockline_at_index(line_idx, &cur_block.unwrap())
-                     )
+                 self.board.print_block_on_board(
+                     rules::rule_blockline_at_index(line_idx, cur_block.as_ref().unwrap())
+                 )
             );
             println!("{} {} {}", self.gravity, time_idx_fn(self.gravity), time_idx);
             time_idx = time_idx - UPDATE_FREQ;
@@ -91,15 +109,6 @@ impl<'a> TetrisGame<'a> {
     pub fn increase_gravity(&mut self) {
         if self.gravity < MAX_GRAVITY {
             self.gravity *= 2.0;
-        }
-    }
-}
-
-impl<'a> Drop for TetrisGame<'a> {
-    fn drop(&mut self) {
-        for worker in &mut self.workers {
-            println!("Shutting down worker");
-            worker.join();
         }
     }
 }

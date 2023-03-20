@@ -16,12 +16,12 @@ pub const MAX_GRAVITY: f32 = 12.8;
 // Job struct
 pub type Job = Box<dyn Fn() + Send + 'static>;
 
-pub enum Shift {
+pub enum ShiftCmd {
     Left,
     Right,
 }
 
-pub enum Rotate {
+pub enum RotateCmd {
     Left,
     Right,
 }
