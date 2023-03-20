@@ -21,7 +21,7 @@ pub struct Board {
 
 impl fmt::Display for Board {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = self.print_block_on_board(|x| &0);
+        let s = self.print_block_on_board(|x| 0);
         write!(f, "{}", s)
     }
 }
@@ -66,9 +66,9 @@ impl Board {
     }
 
     /// Prints the block with the corresponding state of the board
-    pub fn print_block_on_board<'a, F>(&self, block_fn: F) -> String 
+    pub fn print_block_on_board<F>(&self, block_fn: F) -> String
     where
-        F: Fn(usize) -> &'a u16,
+        F: Fn(usize) -> u16,
     {
         let mut s = String::new();
         for (i, &line) in self.state.iter()

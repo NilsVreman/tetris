@@ -17,12 +17,12 @@ pub fn rule_nextblock() -> impl Fn(&usize) -> usize {
 use crate::block;
 
 /// return a closure that returns the block's line at index `i`
-pub fn rule_blockline_at_index<'a>(idx: usize, block: &'a block::Block) -> impl Fn(usize) -> &'a u16 {
+pub fn rule_blockline_at_index(idx: usize, block: &block::Block) -> impl Fn(usize) -> u16 {
     let lines = block.config();
     move |i: usize| {
         match i {
-            x if i >= idx && i < idx+4 => &lines[i - idx],
-            _ => &0,
+            x if i >= idx && i < idx+4 => lines[i - idx],
+            _ => 0,
         }
     }
 }

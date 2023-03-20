@@ -13,4 +13,8 @@ pub fn main() {
     //println!("\n\n{}", board);
     let mut tetris = tetris::TetrisGame::new();
     tetris.run();
+
+    println!("{}", 2_u32);
+    println!("{}", 2_u32 << 1);
+    println!("{}", 2_u32 >> 1);
 }
