@@ -17,7 +17,7 @@ pub fn rule_nextblock() -> impl Fn(&usize) -> usize {
 use crate::block;
 
 /// return a closure that returns the block's line at index `i`
-pub fn rule_blockline_at_index(idx: usize, block: &Box<dyn block::Block>) -> impl Fn(usize) -> u16 {
+pub fn rule_blockline_at_index(idx: usize, block: &block::Block) -> impl Fn(usize) -> u16 {
     let lines = block.config();
     move |i: usize| {
         match i {

@@ -26,17 +26,17 @@ impl BlockGenerator {
 }
 
 impl Iterator for BlockGenerator {
-    type Item = Box<dyn Block>;
+    type Item = Block;
 
     fn next(&mut self) -> Option<Self::Item> {
         let ele: Option<Self::Item> = match self.thisidx {
-            0 => Some(Box::new(BlockI::new())),
-            1 => Some(Box::new(BlockJ::new())),
-            2 => Some(Box::new(BlockL::new())),
-            3 => Some(Box::new(BlockO::new())),
-            4 => Some(Box::new(BlockS::new())),
-            5 => Some(Box::new(BlockT::new())),
-            6 => Some(Box::new(BlockZ::new())),
+            0 => Some(Block::new(BlockType::I)),
+            1 => Some(Block::new(BlockType::J)),
+            2 => Some(Block::new(BlockType::L)),
+            3 => Some(Block::new(BlockType::O)),
+            4 => Some(Block::new(BlockType::S)),
+            5 => Some(Block::new(BlockType::T)),
+            6 => Some(Block::new(BlockType::Z)),
             _ => None,
         };
         self.thisidx = self.nextidx;
