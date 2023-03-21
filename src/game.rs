@@ -74,6 +74,7 @@ impl TetrisGame {
 
             if time_idx == 0 {
                 time_idx = time_idx_fn(self.gravity);
+                todo!("Problem here because line_idx is not representative of lower edge anymore");
                 if line_idx == 0 || !self.board.is_feasible(line_idx - 1, cur_block.as_ref().unwrap()) {
 
                     let status = self.board.add_block(line_idx, cur_block.as_ref().unwrap());
