@@ -5,6 +5,7 @@ use std::fmt;
 
 use crate::{
     game_util::{
+        BLOCK_HEIGHT,
         u16_to_string,
         ShiftCmd,
         RotateCmd,
@@ -27,7 +28,7 @@ enum BlockType {
 
 #[derive(Copy, Clone)]
 pub struct Block {
-    lines: [u16; 4],  // Definitely possible to do this with u64, but a bit more convoluted
+    lines: [u16; BLOCK_HEIGHT],  // Definitely possible to do this with u64, but a bit more convoluted
     shifts: i8,
     rotation: BlockRotation,
     blocktype: BlockType,

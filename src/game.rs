@@ -54,7 +54,7 @@ impl TetrisGame {
         self.increase_gravity();
         self.increase_gravity();
         self.increase_gravity();
-        //self.increase_gravity();
+        self.increase_gravity();
 
         let time_idx_fn = |x| (1.0 / self.gravity * 1_000.0) as u64;
 
@@ -82,24 +82,25 @@ impl TetrisGame {
                     }
                     line_idx = game_util::BOARD_LINE_FAIL;
                 } else {
-                    line_idx -= 1;
                     // TODO: Remove //
-                    if line_idx % 7 == 0 {
-                        self.shift_block_if_feasible(&mut cur_block, &game_util::ShiftCmd::Right);
-                        self.rotate_block_if_feasible(&mut cur_block, &game_util::RotateCmd::Right);
-                    } else if line_idx % 11 == 0 {
-                        self.shift_block_if_feasible(&mut cur_block, &game_util::ShiftCmd::Left);
-                        self.rotate_block_if_feasible(&mut cur_block, &game_util::RotateCmd::Left);
-                    }
+                    line_idx -= 1;
+                }
+
+                if line_idx % 2 == 0 {
+                    self.shift_block_if_feasible(line_idx, &mut cur_block, &game_util::ShiftCmd::Right);
+                    self.rotate_block_if_feasible(line_idx, &mut cur_block, &game_util::RotateCmd::Right);
+                } else if line_idx % 1 == 0 {
+                    self.shift_block_if_feasible(line_idx, &mut cur_block, &game_util::ShiftCmd::Left);
+                    self.rotate_block_if_feasible(line_idx, &mut cur_block, &game_util::RotateCmd::Left);
                 }
             }
 
-            println!("{}\n",
+            println!("{}",
                  self.board.print_lines_on_board(
                      rules::rule_line_at_index(line_idx, &cur_block.config())
                  )
             );
-            println!("{} {} {}\n{}", self.gravity, time_idx_fn(self.gravity), time_idx, &cur_block);
+            println!("{} {} {}", self.gravity, time_idx_fn(self.gravity), time_idx);
             time_idx = time_idx - game_util::UPDATE_FREQ;
 
             thread::sleep(
@@ -119,7 +120,7 @@ impl TetrisGame {
 
     // Checks whether the block can fit on the board
     fn block_is_feasible(&self, idx: usize, block: &block::Block) -> bool {
-        if let Ok(board_lines) = self.board.config(idx..idx+4) {
+        if let Ok(board_lines) = self.board.config(idx) {
             let block_lines = block.config();
             return board_lines[0] & block_lines[0] == 0 &&
                 board_lines[1] & block_lines[1] == 0 &&
@@ -129,12 +130,20 @@ impl TetrisGame {
         return false
     }
 
-    fn rotate_block_if_feasible(&self, block: &mut block::Block, cmd: &game_util::RotateCmd) {
-        
+    fn rotate_block_if_feasible(&self, idx: usize, block: &mut block::Block, cmd: &game_util::RotateCmd) {
+        let mut block_clone = block.clone();
+        block_clone.rotate(&cmd);
+        if self.block_is_feasible(idx, &block_clone) {
+            block.rotate(&cmd);
+        }
     }
 
-    fn shift_block_if_feasible(&self, block: &mut block::Block, cmd: &game_util::ShiftCmd) {
-        
+    fn shift_block_if_feasible(&self, idx: usize, block: &mut block::Block, cmd: &game_util::ShiftCmd) {
+        let mut block_clone = block.clone();
+        block_clone.shift(&cmd);
+        if self.block_is_feasible(idx, &block_clone) {
+            block.shift(&cmd);
+        }
     }
 }
 

@@ -3,10 +3,12 @@ use std::fmt;
 use crate::game_util::{
     u16_to_string,
     WALLS,
+    FLOOR,
     BOARD_FILLED_LINE,
     BOARD_LINE_FAIL,
     BOARD_LINE_HEIGHT,
     BOARD_LINE_FLOOR,
+    BLOCK_HEIGHT,
     TetrisError,
 };
 
@@ -17,7 +19,6 @@ pub enum BoardStatus {
 
 pub struct Board {
     state: Vec<u16>,  // NOTE: We assume index [0] is bottom of board
-    walls: u16,
 }
 
 impl fmt::Display for Board {
@@ -28,18 +29,17 @@ impl fmt::Display for Board {
 
 impl Board {
     pub fn new() -> Self {
-        Self {
-            state: Vec::from([WALLS; BOARD_LINE_HEIGHT]),
-            walls: WALLS,
-        }
+        let mut state = Vec::from([WALLS; BOARD_LINE_HEIGHT]);
+        for i in 0..BOARD_LINE_FLOOR { state[i] = FLOOR; }
+        Self { state }
     }
 
     /// todo!()
-    pub fn config(&self, range: std::ops::Range<usize>) -> Result<Vec<u16>, TetrisError> {
-        if range.end >= self.state.len() {
-            return Err(TetrisError(format!("Can't access board at indices {:?}", range)))
+    pub fn config(&self, idx: usize) -> Result<Vec<u16>, TetrisError> {
+        if idx+BLOCK_HEIGHT >= self.state.len() {
+            return Err(TetrisError(format!("Can't access board at indices {:?}", idx..idx+BLOCK_HEIGHT)))
         }
-        Ok(self.state[range].to_vec())
+        Ok(self.state[idx..idx+BLOCK_HEIGHT].to_vec())
     }
 
     /// Adds a block to the board and returns how many lines were cleared
@@ -65,13 +65,12 @@ impl Board {
         let mut s = String::new();
         for (i, &line) in self.state.iter()
                 .enumerate()
-                .skip(BOARD_LINE_FLOOR)
+                .skip(BOARD_LINE_FLOOR - 1)
                 .rev()
                 .skip(BOARD_LINE_HEIGHT - BOARD_LINE_FAIL - 1) {
             s.push_str( &u16_to_string( line | line_fn(i) )[..] );
             s.push_str("\n");
         }
-        s.push_str(&format!("  {}  ", "#".repeat(12))[..]);
         s
     }
 
