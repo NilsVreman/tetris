@@ -42,7 +42,7 @@ impl TetrisGame {
             blockgenerator: block::BlockGenerator::new(rules::rule_nextblock()),
             score: scoreboard::Scoreboard::new(rules::rule_score()),
             workers: Vec::new(),
-            gravity: 0.2_f32,
+            gravity: 0.15625,
         }
     }
 
@@ -60,6 +60,7 @@ impl TetrisGame {
         self.increase_gravity();
         self.increase_gravity();
         self.increase_gravity();
+        //self.increase_gravity();
 
         let time_idx_fn = |x| (1.0 / self.gravity * 1_000.0) as u64;
 
@@ -74,7 +75,9 @@ impl TetrisGame {
             if time_idx == 0 {
                 time_idx = time_idx_fn(self.gravity);
                 if line_idx == 0 || !self.board.is_feasible(line_idx - 1, cur_block.as_ref().unwrap()) {
+
                     let status = self.board.add_block(line_idx, cur_block.as_ref().unwrap());
+
                     if let board::BoardStatus::Overflow(n) = status {
                         executing = false; // TODO: Fix
                     }
@@ -85,6 +88,10 @@ impl TetrisGame {
                     // TODO: Remove //
                     if line_idx % 7 == 0 {
                         cur_block.as_mut().unwrap().shift(&ShiftCmd::Right);
+                        cur_block.as_mut().unwrap().rotate(&RotateCmd::Right);
+                    } else if line_idx % 11 == 0 {
+                        cur_block.as_mut().unwrap().shift(&ShiftCmd::Left);
+                        cur_block.as_mut().unwrap().rotate(&RotateCmd::Left);
                     }
                 }
             }
@@ -94,14 +101,14 @@ impl TetrisGame {
                      rules::rule_blockline_at_index(line_idx, cur_block.as_ref().unwrap())
                  )
             );
-            println!("{} {} {}", self.gravity, time_idx_fn(self.gravity), time_idx);
+            println!("{} {} {}\n{}", self.gravity, time_idx_fn(self.gravity), time_idx, cur_block.as_ref().unwrap());
             time_idx = time_idx - UPDATE_FREQ;
 
             thread::sleep(
                 Duration::from_millis(UPDATE_FREQ)
                 .checked_sub(start.elapsed())
-                .unwrap()
-            )
+                .unwrap_or_else(|| Duration::from_millis(0))
+            );
         }
     }
 
