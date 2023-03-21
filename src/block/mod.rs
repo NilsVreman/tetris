@@ -21,24 +21,6 @@ enum BlockType {
     I, J, L, O, S, T, Z,
 }
 
-////////////////
-// Main Trait //
-////////////////
-
-pub trait Rotate {
-    fn rotate(&mut self, cmd: &RotateCmd);
-}
-
-pub trait Shift {
-    fn shift(&mut self, cmd: &ShiftCmd);
-}
-
-pub trait Config {
-    fn config(&self) -> Vec<u16>;
-}
-
-pub trait BlockTraits: Rotate + Shift + Config + fmt::Display {}
-
 ///////////
 // Block //
 ///////////

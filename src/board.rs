@@ -3,11 +3,12 @@ use std::fmt;
 use crate::game_util::{
     u16_to_string,
     WALLS,
-    FULL_LINE,
-    FAIL_HEIGHT,
-    BOARD_HEIGHT,
+    BOARD_FILLED_LINE,
+    BOARD_LINE_FAIL,
+    BOARD_LINE_HEIGHT,
+    BOARD_LINE_FLOOR,
+    TetrisError,
 };
-use crate::block::Block;
 
 pub enum BoardStatus {
     Overflow(usize),
@@ -15,38 +16,30 @@ pub enum BoardStatus {
 }
 
 pub struct Board {
-    state: [u16; BOARD_HEIGHT],  // NOTE: We assume index [0] is bottom of board
+    state: Vec<u16>,  // NOTE: We assume index [0] is bottom of board
     walls: u16,
 }
 
 impl fmt::Display for Board {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = self.print_block_on_board(|x| 0);
-        write!(f, "{}", s)
+        write!(f, "{}", self.print_lines_on_board(|x| 0))
     }
 }
 
 impl Board {
     pub fn new() -> Self {
         Self {
-            state: [WALLS; BOARD_HEIGHT],
+            state: Vec::from([WALLS; BOARD_LINE_HEIGHT]),
             walls: WALLS,
         }
     }
 
-    /// Checks whether a block can be added to the board
-    ///
-    /// idx: Lowest line to check from
-    /// block: The block to check
-    ///
-    /// returns feasibility certificate
-    pub fn is_feasible(&self, idx: usize, block: &Block) -> bool {
-        let lines = block.config();
-        if idx+3 >= BOARD_HEIGHT { return false }
-        return self.state[idx] & lines[0] == 0 &&
-            self.state[idx+1] & lines[1] == 0 &&
-            self.state[idx+2] & lines[2] == 0 &&
-            self.state[idx+3] & lines[3] == 0
+    /// todo!()
+    pub fn config(&self, range: std::ops::Range<usize>) -> Result<Vec<u16>, TetrisError> {
+        if range.end >= self.state.len() {
+            return Err(TetrisError(format!("Can't access board at indices {:?}", range)))
+        }
+        Ok(self.state[range].to_vec())
     }
 
     /// Adds a block to the board and returns how many lines were cleared
@@ -55,27 +48,27 @@ impl Board {
     /// block: The block to add
     ///
     /// returns an Option: Some(the number of lines to clear), or None if we have failed
-    pub fn add_block(&mut self, idx: usize, block: &Block) -> BoardStatus {
-        let lines = block.config();
+    pub fn add_lines(&mut self, start_idx: usize, lines: &Vec<u16>) -> BoardStatus {
         let mut n = 0;
-        for i in 0..4 {
-            self.state[idx+i] |= lines[i];
-            n += if self.line_is_full(idx+i) { 1 } else { 0 };
+        for i in 0..lines.len() {
+            self.state[start_idx+i] |= lines[i];
+            n += if self.line_is_full(start_idx+i) { 1 } else { 0 };
         }
-        return if self.state[FAIL_HEIGHT] == WALLS { BoardStatus::Okay(n) } else { BoardStatus::Overflow(n) } 
+        return if self.state[BOARD_LINE_FAIL] == WALLS { BoardStatus::Okay(n) } else { BoardStatus::Overflow(n) } 
     }
 
     /// Prints the block with the corresponding state of the board
-    pub fn print_block_on_board<F>(&self, block_fn: F) -> String
+    pub fn print_lines_on_board<F>(&self, line_fn: F) -> String
     where
         F: Fn(usize) -> u16,
     {
         let mut s = String::new();
         for (i, &line) in self.state.iter()
                 .enumerate()
+                .skip(BOARD_LINE_FLOOR)
                 .rev()
-                .skip(BOARD_HEIGHT - FAIL_HEIGHT - 1) {
-            s.push_str( &u16_to_string( line | block_fn(i) )[..] );
+                .skip(BOARD_LINE_HEIGHT - BOARD_LINE_FAIL - 1) {
+            s.push_str( &u16_to_string( line | line_fn(i) )[..] );
             s.push_str("\n");
         }
         s.push_str(&format!("  {}  ", "#".repeat(12))[..]);
@@ -84,14 +77,14 @@ impl Board {
 
     // Checks whether line is full or not
     fn line_is_full(&self, idx: usize) -> bool {
-        self.state[idx] & FULL_LINE == self.state[idx]
+        self.state[idx] & BOARD_FILLED_LINE == self.state[idx]
     }
 
     // Clears line at idx and moves all other lines downwards
     pub fn clear_line(&mut self, idx: usize) {
-        for i in idx..FAIL_HEIGHT-1 {
+        for i in idx..BOARD_LINE_FAIL-1 {
             self.state[i] = self.state[i+1];
         }
-        self.state[FAIL_HEIGHT - 1] = WALLS;
+        self.state[BOARD_LINE_FAIL - 1] = WALLS;
     }
 }
