@@ -1,49 +1,12 @@
-///////////
-// Rules //
-///////////
+use std::ops::Add;
 
-/// How much the score should change depending on the number of lines cleared
-pub fn rule_score() -> impl Fn(&usize) -> usize {
-    |x: &usize| match x {
-        1 => 1,
-        2 => 3,
-        3 => 7,
-        4 => 13,
-        _ => 0
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
+pub struct Coord(pub i32, pub i32);
+
+impl Add for Coord {
+    type Output = Coord;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Coord(self.0 + rhs.0, self.1 + rhs.1)
     }
 }
-
-/// How much the score should change depending on the number of lines cleared
-pub fn rule_nextblock() -> impl Fn(&usize) -> usize {
-    |x: &usize| (x+1) % 7
-}
-
-/// return a closure that returns the block's line at index `i`
-pub fn rule_line_at_index(idx: usize, lines: &Vec<u16>) -> impl Fn(usize) -> u16 + '_ {
-    move |i: usize| {
-        match i {
-            x if i >= idx && i < idx+4 => lines[i - idx],
-            _ => 0,
-        }
-    }
-}
-
-///////////////
-// Functions //
-///////////////
-
-pub fn u16_to_string(u: u16) -> String {
-    (0..16).rev()
-        .map(|i| if u & (1 << i) != 0 { '#' } else { ' ' })
-        .collect()
-}
-
-////////////////
-// Additional //
-////////////////
-
-// Job struct
-pub type Job = Box<dyn Fn() + Send + 'static>;
-
-// Error type
-pub struct TetrisError(pub String);

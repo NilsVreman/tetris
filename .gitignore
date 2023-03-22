@@ -11,3 +11,5 @@ Cargo.lock
 
 # Personal
 *.swp
+
+old_src/
