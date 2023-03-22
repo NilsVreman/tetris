@@ -3,13 +3,11 @@ pub use crate::block::block_generator::BlockGenerator;
 
 use std::fmt;
 
-use crate::{
-    game_util::{
-        BLOCK_HEIGHT,
-        u16_to_string,
-        ShiftCmd,
-        RotateCmd,
-    },
+use crate::consts::BLOCK_HEIGHT;
+use crate::util::u16_to_string;
+use crate::enums::{
+    ShiftCmd,
+    RotateCmd,
 };
 
 #[derive(Copy, Clone)]

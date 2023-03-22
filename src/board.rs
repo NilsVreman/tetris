@@ -1,7 +1,6 @@
 use std::fmt;
 
-use crate::game_util::{
-    u16_to_string,
+use super::consts::{
     WALLS,
     FLOOR,
     BOARD_FILLED_LINE,
@@ -9,13 +8,12 @@ use crate::game_util::{
     BOARD_LINE_HEIGHT,
     BOARD_LINE_FLOOR,
     BLOCK_HEIGHT,
+};
+use super::util::{
+    u16_to_string,
     TetrisError,
 };
-
-pub enum BoardStatus {
-    Overflow(usize),
-    Okay(usize),
-}
+use super::enums::BoardStatus;
 
 pub struct Board {
     state: Vec<u16>,  // NOTE: We assume index [0] is bottom of board

@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::game_util::{
+use crate::util::{
     Job,
 };
 
