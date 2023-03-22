@@ -9,7 +9,7 @@ Tetris implemented in Rust
 
 Rotation Scheme:
 
-![alt text](rotation_scheme.pdf "Tetris rotations")
+![alt text](rotation_scheme.png "Tetris rotations")
 
 
 ## Point system
