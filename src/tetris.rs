@@ -13,7 +13,7 @@ pub struct Tetris {
 impl Tetris {
     pub fn new(width: i32, height: i32) -> Self {
         assert!(width >= 4 && height >= 4);
-        let mut gen = BlockGenerator::new(|x| (x + 1) % 7);
+        let mut gen = BlockGenerator::new();
         Self {
             width,
             height,
@@ -61,39 +61,66 @@ impl Tetris {
             == self.width
     }
 
+    // Clears line
     fn clear_line(&mut self, line: usize) {
         self.state.iter_mut().for_each(|block| block.clear_line(line));
     }
 
+    // Clears all filled lines and removes the blocks that are now empty from our state
     fn clear_filled_lines(&mut self) {
+        let mut any_cleared = false;
+
         for line in 0..(self.height as usize) {
             if self.is_line_full(line) {
+                any_cleared = true;
                 self.clear_line(line);
             }
         }
+        // Removes all blocks that were fully cleared
+        if any_cleared { 
+            self.state.retain(|block| !block.is_fully_cleared());
+        }
+    }
+
+    /// todo!()
+    pub fn current_block(&self) -> &Block {
+        &self.current_block
+    }
+
+    /// todo!()
+    pub fn peek_next_block(&self) -> Option<Block> {
+        self.block_generator.peek_next()
+    }
+
+    /// todo!()
+    pub fn state_config(&self) -> impl Iterator<Item=&Block> {
+        self.state.iter()
     }
 
     /// todo!()
     /// returns whether the game is lost or not
     pub fn tick(&mut self) -> GameStatus {
+
         let dropped_block = self.current_block.drop_one();
+
         if self.block_outside_bounds(&dropped_block)
             || self.block_collision(&dropped_block)
         {
+            // If dropped block is infeasible,
+            // add the current block to the tetris state and change current_block
             if let Some(next_block) = self.block_generator.next() {
                 let block_to_add = mem::replace(&mut self.current_block, next_block);
                 self.state.push(block_to_add);
                 self.clear_filled_lines();
                 
-                if self.block_collision(&self.current_block) {
-                    return GameStatus::GameOver
-                }
+                // If game is over, i.e., if *new* current_block collides with state.
+                if self.block_collision(&self.current_block) { return GameStatus::GameOver }
             } 
         } else {
             self.current_block = dropped_block;
         }
 
-        return GameStatus::Okay
+        GameStatus::Okay
     }
 
     pub fn print(&self) {

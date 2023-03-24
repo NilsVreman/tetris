@@ -84,6 +84,7 @@ impl Block {
     }
 
     /// todo!()
+    /// TODO: Maybe fix to be mutating and isntead Clone in Tetris game
     pub fn shifted_version(&self, cmd: &ShiftCmd) -> Self {
         match cmd {
             ShiftCmd::Left => self + Coord(-1, 0),
@@ -92,6 +93,7 @@ impl Block {
     }
 
     /// todo!()
+    /// TODO: Maybe fix to be mutating and instead Clone in Tetris game
     pub fn rotated_version(&self, cmd: &RotateCmd) -> Self {
         if let BlockID::O = self.id {
             return self.clone()
@@ -119,6 +121,16 @@ impl Block {
                 Some(c)
             }).collect();
     }
+
+    /// todo!()
+    pub fn is_fully_cleared(&self) -> bool {
+        self.coords.is_empty()
+    }
+
+    /// todo!()
+    pub fn id(&self) -> &BlockID {
+        &self.id
+    }
 }
 
 impl std::fmt::Debug for Block {
@@ -143,14 +155,25 @@ pub struct BlockGenerator {
 
 impl BlockGenerator {
     /// return a blockgenerator which generates the next block based on rule from closure f
-    pub fn new<F>(f: F) -> Self
-    where
-        F: Fn(&usize) -> usize + 'static,
-    {
+    pub fn new() -> Self {
+        let f = |x: &usize| (x + 1) % 7; // Fn which determines the next block based on the current block.
         Self {
             thisidx: 0,
             nextidx: f(&0),
             fn_next: Box::new(f),
+        }
+    }
+
+    pub fn peek_next(&self) -> Option<Block> {
+        match self.nextidx {
+            0 => Some(Block::new(BlockID::I)),
+            1 => Some(Block::new(BlockID::J)),
+            2 => Some(Block::new(BlockID::L)),
+            3 => Some(Block::new(BlockID::O)),
+            4 => Some(Block::new(BlockID::S)),
+            5 => Some(Block::new(BlockID::T)),
+            6 => Some(Block::new(BlockID::Z)),
+            _ => None,
         }
     }
 }
@@ -171,6 +194,6 @@ impl Iterator for BlockGenerator {
         };
         self.thisidx = self.nextidx;
         self.nextidx = (self.fn_next)(&self.thisidx);
-        return ele;
+        ele
     }
 }
