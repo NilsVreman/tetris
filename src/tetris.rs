@@ -30,11 +30,8 @@ impl Tetris {
 
         // Generate first block and center it
         let mut gen = BlockGenerator::new();
-
         let first_block = gen.next().unwrap();
-        let half_block_width = first_block.width() as f32 / 2.0;
-        let half_width = width as f32 / 2.0;
-        let first_block = &first_block + Coord(1 + (half_width - half_block_width) as i32, 0);
+        let first_block = &first_block + Coord(1 + ((width - first_block.width()) as f32 / 2.0) as i32, 0);
 
         Self {
             width,

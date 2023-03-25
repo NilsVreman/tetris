@@ -10,9 +10,10 @@ const STROKE_WIDTH: f32 = 2.0;
 const STROKE: Stroke = Stroke { width: STROKE_WIDTH, color: Color32::BLACK };
 const ROUNDING_PX: f32 = 2.0;
 const ROUNDING: Rounding = Rounding { nw: ROUNDING_PX, ne: ROUNDING_PX, sw: ROUNDING_PX, se: ROUNDING_PX, };
-const CELL_SIZE: f32 = 50.0;
+pub const CELL_SIZE: f32 = 30.0;
 const CELL: Rect = Rect { min: pos2(0.0, 0.0), max: pos2(CELL_SIZE, CELL_SIZE) };
 
+const COLOR_WALL: Color32 = Color32::WHITE;
 const COLOR_I: Color32 = Color32::from_rgb(250, 200, 200);
 const COLOR_J: Color32 = Color32::from_rgb(200, 250, 200);
 const COLOR_L: Color32 = Color32::from_rgb(200, 200, 250);
@@ -41,44 +42,53 @@ impl TetrisApp {
     }
 
     fn paint_state(&self, painter: &egui::Painter) {
-        self.game.state_config().for_each(|block| TetrisApp::paint_block(&painter, block));
+        self.game.state_config().for_each(|block| Self::paint_block(&painter, block));
+    }
+
+    fn paint_boundary(&self, painter: &egui::Painter) {
+        self.game.boundary_config().for_each(|&coord| Self::paint_coord(&painter, CELL_SIZE * coord, &COLOR_WALL));
     }
 
     fn paint_block(painter: &egui::Painter, block: &Block) {
         block.config().for_each(|&coord| {
-            TetrisApp::paint_coord(&painter, CELL_SIZE * coord, block.id())
+            Self::paint_coord(&painter, CELL_SIZE * coord, Self::color_from_id(block.id()))
         });
     }
 
     fn paint_next_block(painter: &egui::Painter, block: &Option<Block>, at_pos: &Pos2) {
         if let Some(block) = block {
-            println!("Find size of peeked block and start from there");
+            let half_block_width = CELL_SIZE * (block.width() as f32) / 2.0;
             block.config().for_each(|&coord| {
-                TetrisApp::paint_coord(&painter,
-                                       Coord(
-                                           ((CELL_SIZE * (coord.0-1) as f32) as i32) + (at_pos.x as i32),
-                                           ((CELL_SIZE * coord.1 as f32) as i32) + (at_pos.y as i32)
-                                           ),
-                                       block.id());
+                Self::paint_coord(
+                    &painter,
+                    Coord(
+                        (at_pos.x - half_block_width + CELL_SIZE * coord.0 as f32) as i32,
+                        (at_pos.y + CELL_SIZE * (coord.1 + 1) as f32) as i32
+                    ),
+                    Self::color_from_id(block.id()));
             });
         }
     }
 
-    fn paint_coord(painter: &egui::Painter, coord: Coord, id: &BlockID) {
+    fn paint_coord(painter: &egui::Painter, coord: Coord, color: &Color32) {
         painter.rect(
             CELL.translate(Vec2::new(coord.0 as f32, coord.1 as f32)),
             ROUNDING,
-            match id {
-                BlockID::I => COLOR_I,
-                BlockID::J => COLOR_J,
-                BlockID::L => COLOR_L,
-                BlockID::O => COLOR_O,
-                BlockID::S => COLOR_S,
-                BlockID::T => COLOR_T,
-                BlockID::Z => COLOR_Z,
-            },
+            *color,
             STROKE,
         );
+    }
+
+    fn color_from_id(id: &BlockID) -> &Color32 {
+        match id {
+            BlockID::I => &COLOR_I,
+            BlockID::J => &COLOR_J,
+            BlockID::L => &COLOR_L,
+            BlockID::O => &COLOR_O,
+            BlockID::S => &COLOR_S,
+            BlockID::T => &COLOR_T,
+            BlockID::Z => &COLOR_Z,
+        }
     }
 }
 
@@ -127,6 +137,7 @@ impl eframe::App for TetrisApp {
         // Tetris field
         CentralPanel::default()
             .show(ctx, |ui| {
+                self.paint_boundary(ui.painter());
                 self.paint_state(ui.painter());
                 TetrisApp::paint_block(ui.painter(), self.game.current_block());
             });

@@ -24,7 +24,7 @@ pub fn main() {
 
 fn native_options(cell_size: f32) -> eframe::NativeOptions {
     let mut native_options = eframe::NativeOptions::default();
-    native_options.initial_window_size = Some(egui::Vec2::new(cell_size * 12.0 + 250.0, cell_size * 22.0));
+    native_options.initial_window_size = Some(egui::Vec2::new(cell_size * 12.0 + 250.0, cell_size * 20.5));
     native_options.resizable = false;
     native_options.mouse_passthrough = true;
     native_options.always_on_top = true;

@@ -46,7 +46,7 @@ impl Block {
                 id,
             },
             BlockID::O => Self {
-                coords: HashSet::from([Coord(1, 0), Coord(1, -1), Coord(2, 0), Coord(2, -1)]),
+                coords: HashSet::from([Coord(0, 0), Coord(0, -1), Coord(1, 0), Coord(1, -1)]),
                 center: Coord(0, 0),
                 id,
             },
@@ -140,7 +140,7 @@ impl Block {
             if coord.0 < x_min { x_min = coord.0; }
             if coord.0 > x_max { x_max = coord.0; }
         }
-        x_max - x_min
+        x_max - x_min + 1
     }
 }
 
