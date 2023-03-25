@@ -1,11 +1,15 @@
 use std::mem;
+use std::collections::HashSet;
+
 use super::block::{Block, BlockGenerator};
 use super::enums::{ShiftCmd, RotateCmd, GameStatus};
+use super::util::Coord;
 
 pub struct Tetris {
     width: i32,
     height: i32,
     state: Vec<Block>,
+    boundary: HashSet<Coord>,
     current_block: Block,
     block_generator: BlockGenerator,
 }
@@ -13,20 +17,37 @@ pub struct Tetris {
 impl Tetris {
     pub fn new(width: i32, height: i32) -> Self {
         assert!(width >= 4 && height >= 4);
+
+        // Walls on the outside of the tetris court
+        let mut boundary: HashSet<Coord> = HashSet::with_capacity((height*2 + width + 2) as usize);
+        for i in 0..=height {
+            boundary.insert(Coord(0, i));
+            boundary.insert(Coord(width+1, i));
+        }
+        for i in 1..width+1 {
+            boundary.insert(Coord(i, height));
+        }
+
+        // Generate first block and center it
         let mut gen = BlockGenerator::new();
+
+        let first_block = gen.next().unwrap();
+        let half_block_width = first_block.width() as f32 / 2.0;
+        let half_width = width as f32 / 2.0;
+        let first_block = &first_block + Coord(1 + (half_width - half_block_width) as i32, 0);
+
         Self {
             width,
             height,
+            boundary,
             state: vec![],
-            current_block: gen.next().unwrap(),
+            current_block: first_block,
             block_generator: gen,
         }
     }
 
     fn block_outside_bounds(&self, block: &Block) -> bool {
-        block.config().any(|x| {
-            x.0 < 0 || x.0 >= self.width || x.1 < 0 || x.1 >= self.height
-        })
+        block.config().any(|x| self.boundary.contains(x))
     }
 
     fn block_collision(&self, block: &Block) -> bool {
@@ -54,7 +75,7 @@ impl Tetris {
     }
 
     /// todo!()
-    pub fn is_line_full(&self, line: usize) -> bool {
+    fn is_line_full(&self, line: usize) -> bool {
         self.state.iter()
             .flat_map(|block| block.config())
             .fold(0, |acc, coord| acc + if coord.1 == line as i32 { 1 } else { 0 })
@@ -76,6 +97,7 @@ impl Tetris {
                 self.clear_line(line);
             }
         }
+
         // Removes all blocks that were fully cleared
         if any_cleared { 
             self.state.retain(|block| !block.is_fully_cleared());
@@ -98,6 +120,11 @@ impl Tetris {
     }
 
     /// todo!()
+    pub fn boundary_config(&self) -> impl Iterator<Item=&Coord> {
+        self.boundary.iter()
+    }
+
+    /// todo!()
     /// returns whether the game is lost or not
     pub fn tick(&mut self) -> GameStatus {
 
@@ -109,6 +136,7 @@ impl Tetris {
             // If dropped block is infeasible,
             // add the current block to the tetris state and change current_block
             if let Some(next_block) = self.block_generator.next() {
+                let next_block = self.center_block(&next_block);
                 let block_to_add = mem::replace(&mut self.current_block, next_block);
                 self.state.push(block_to_add);
                 self.clear_filled_lines();
@@ -123,8 +151,10 @@ impl Tetris {
         GameStatus::Okay
     }
 
-    pub fn print(&self) {
-        println!("{} {} {:#?} {:?}\n", self.width, self.height, self.state, self.current_block);
+    fn center_block(&self, block: &Block) -> Block {
+        let half_block_width = block.width() as f32 / 2.0;
+        let half_width = self.width as f32 / 2.0;
+        block + Coord(1 + (half_width - half_block_width) as i32, 0)
     }
 
     pub fn run(&mut self) {

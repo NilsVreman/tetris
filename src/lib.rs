@@ -6,4 +6,4 @@ mod app;
 
 pub use enums::GameStatus;
 pub use tetris::Tetris;
-pub use app::TetrisApp;
+pub use app::{TetrisApp, CELL_SIZE};

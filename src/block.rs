@@ -11,8 +11,8 @@ use super::enums::{
 #[derive(Clone)]
 pub struct Block {
     coords: HashSet<Coord>,
-    id: BlockID,
     center: Coord,
+    id: BlockID,
 }
 
 impl Add<Coord> for &Block {
@@ -36,32 +36,32 @@ impl Block {
                 id,
             },
             BlockID::J => Self {
-                coords: HashSet::from([Coord(0, 0), Coord(0, 1), Coord(1, 0), Coord(2, 0)]),
+                coords: HashSet::from([Coord(0, 0), Coord(0, -1), Coord(1, 0), Coord(2, 0)]),
                 center: Coord(1, 0),
                 id,
             },
             BlockID::L => Self {
-                coords: HashSet::from([Coord(0, 0), Coord(2, 1), Coord(1, 0), Coord(2, 0)]),
+                coords: HashSet::from([Coord(0, 0), Coord(2, -1), Coord(1, 0), Coord(2, 0)]),
                 center: Coord(1, 0),
                 id,
             },
             BlockID::O => Self {
-                coords: HashSet::from([Coord(1, 0), Coord(1, 1), Coord(2, 0), Coord(2, 1)]),
+                coords: HashSet::from([Coord(1, 0), Coord(1, -1), Coord(2, 0), Coord(2, -1)]),
                 center: Coord(0, 0),
                 id,
             },
             BlockID::S => Self {
-                coords: HashSet::from([Coord(0, 0), Coord(1, 0), Coord(1, 1), Coord(2, 1)]),
+                coords: HashSet::from([Coord(0, 0), Coord(1, 0), Coord(1, -1), Coord(2, -1)]),
                 center: Coord(1, 0),
                 id,
             },
             BlockID::T => Self {
-                coords: HashSet::from([Coord(0, 0), Coord(1, 0), Coord(1, 1), Coord(2, 0)]),
+                coords: HashSet::from([Coord(0, 0), Coord(1, 0), Coord(1, -1), Coord(2, 0)]),
                 center: Coord(1, 0),
                 id,
             },
             BlockID::Z => Self {
-                coords: HashSet::from([Coord(0, 1), Coord(1, 1), Coord(1, 0), Coord(2, 0)]),
+                coords: HashSet::from([Coord(0, -1), Coord(1, -1), Coord(1, 0), Coord(2, 0)]),
                 center: Coord(1, 0),
                 id,
             },
@@ -131,14 +131,16 @@ impl Block {
     pub fn id(&self) -> &BlockID {
         &self.id
     }
-}
 
-impl std::fmt::Debug for Block {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Block")
-            .field("id", &self.id)
-            .field("coords", &self.coords)
-            .finish()
+    /// todo!()
+    pub fn width(&self) -> i32 {
+        let mut x_min = i32::MAX;
+        let mut x_max = 0;
+        for coord in &self.coords {
+            if coord.0 < x_min { x_min = coord.0; }
+            if coord.0 > x_max { x_max = coord.0; }
+        }
+        x_max - x_min
     }
 }
 
@@ -149,8 +151,7 @@ impl std::fmt::Debug for Block {
 /// BlockGenerator which generates blocks
 pub struct BlockGenerator {
     fn_next: Box<dyn Fn(&usize) -> usize>,
-    nextidx: usize,
-    thisidx: usize,
+    idx: usize,
 }
 
 impl BlockGenerator {
@@ -158,14 +159,13 @@ impl BlockGenerator {
     pub fn new() -> Self {
         let f = |x: &usize| (x + 1) % 7; // Fn which determines the next block based on the current block.
         Self {
-            thisidx: 0,
-            nextidx: f(&0),
+            idx: 0,
             fn_next: Box::new(f),
         }
     }
 
     pub fn peek_next(&self) -> Option<Block> {
-        match self.nextidx {
+        match self.idx {
             0 => Some(Block::new(BlockID::I)),
             1 => Some(Block::new(BlockID::J)),
             2 => Some(Block::new(BlockID::L)),
@@ -182,7 +182,7 @@ impl Iterator for BlockGenerator {
     type Item = Block;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let ele: Option<Self::Item> = match self.thisidx {
+        let ele: Option<Self::Item> = match self.idx {
             0 => Some(Block::new(BlockID::I)),
             1 => Some(Block::new(BlockID::J)),
             2 => Some(Block::new(BlockID::L)),
@@ -192,8 +192,7 @@ impl Iterator for BlockGenerator {
             6 => Some(Block::new(BlockID::Z)),
             _ => None,
         };
-        self.thisidx = self.nextidx;
-        self.nextidx = (self.fn_next)(&self.thisidx);
+        self.idx = (self.fn_next)(&self.idx);
         ele
     }
 }
