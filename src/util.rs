@@ -26,3 +26,4 @@ impl Mul<Coord> for f32 {
         Coord((rhs.0 as f32 * self) as i32, (rhs.1 as f32 * self) as i32)
     }
 }
+

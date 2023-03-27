@@ -150,18 +150,13 @@ impl Block {
 
 /// BlockGenerator which generates blocks
 pub struct BlockGenerator {
-    fn_next: Box<dyn Fn(&usize) -> usize>,
     idx: usize,
 }
 
 impl BlockGenerator {
     /// return a blockgenerator which generates the next block based on rule from closure f
     pub fn new() -> Self {
-        let f = |x: &usize| (x + 1) % 7; // Fn which determines the next block based on the current block.
-        Self {
-            idx: 0,
-            fn_next: Box::new(f),
-        }
+        Self { idx: 0 }
     }
 
     pub fn peek_next(&self) -> Option<Block> {
@@ -182,7 +177,7 @@ impl Iterator for BlockGenerator {
     type Item = Block;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let ele: Option<Self::Item> = match self.idx {
+        let ele = match self.idx {
             0 => Some(Block::new(BlockID::I)),
             1 => Some(Block::new(BlockID::J)),
             2 => Some(Block::new(BlockID::L)),
@@ -192,7 +187,7 @@ impl Iterator for BlockGenerator {
             6 => Some(Block::new(BlockID::Z)),
             _ => None,
         };
-        self.idx = (self.fn_next)(&self.idx);
+        self.idx = (self.idx + 1) % 7;
         ele
     }
 }
