@@ -124,55 +124,39 @@ impl Tetris {
     /// todo!()
     /// returns whether the game is lost or not
     pub fn tick(&mut self) -> GameStatus {
-
-        let dropped_block = self.current_block.drop_one();
-
-        if self.block_outside_bounds(&dropped_block)
-            || self.block_collision(&dropped_block)
-        {
-            // If dropped block is infeasible,
-            // add the current block to the tetris state and change current_block
-            if let Some(next_block) = self.block_generator.next() {
-                let next_block = self.center_block(&next_block);
-                let block_to_add = mem::replace(&mut self.current_block, next_block);
-                self.state.push(block_to_add);
-                self.clear_filled_lines();
-                // TODO: Return how many lines where cleared <25-03-23> //
-                
-                // If game is over, i.e., if *new* current_block collides with state.
-                if self.block_collision(&self.current_block) { return GameStatus::GameOver }
-            } 
-        } else {
-            self.current_block = dropped_block;
-        }
-
-        GameStatus::Okay
+        self.drop_n(1)
     }
 
     /// todo!()
     pub fn hard_drop(&mut self) -> GameStatus {
+        self.drop_n(self.height+2)
+    }
 
-        while true {
+    // aux function for tick and hard_drop (n = how many blocks we should drop maximally)
+    fn drop_n(&mut self, n: i32) -> GameStatus {
+        for _ in 0..n { // how many drops we should perform
+
             let dropped_block = self.current_block.drop_one();
+
             if self.block_outside_bounds(&dropped_block)
                 || self.block_collision(&dropped_block)
-                {
-                    // If dropped block is infeasible,
-                    // add the current block to the tetris state and change current_block
-                    if let Some(next_block) = self.block_generator.next() {
-                        let next_block = self.center_block(&next_block);
-                        let block_to_add = mem::replace(&mut self.current_block, next_block);
-                        self.state.push(block_to_add);
-                        self.clear_filled_lines();
-                        // TODO: Return how many lines where cleared <25-03-23> //
+            {
+                // If dropped block is infeasible,
+                // add the current block to the tetris state and change current_block
+                if let Some(next_block) = self.block_generator.next() {
+                    let next_block = self.center_block(&next_block);
+                    let block_to_add = mem::replace(&mut self.current_block, next_block);
+                    self.state.push(block_to_add);
+                    self.clear_filled_lines();
+                    // TODO: Return how many lines where cleared <25-03-23> //
 
-                        // If game is over, i.e., if *new* current_block collides with state.
-                        if self.block_collision(&self.current_block) { return GameStatus::GameOver }
-                        else { return GameStatus::Okay }
-                    } 
-                } else {
-                    self.current_block = dropped_block;
-                }
+                    // If game is over, i.e., if *new* current_block collides with state.
+                    if self.block_collision(&self.current_block) { return GameStatus::GameOver }
+                    else { return GameStatus::Okay }
+                } 
+            } else {
+                self.current_block = dropped_block;
+            }
         }
         GameStatus::Okay
     }
@@ -181,9 +165,5 @@ impl Tetris {
         let half_block_width = block.width() as f32 / 2.0;
         let half_width = self.width as f32 / 2.0;
         block + Coord(1 + (half_width - half_block_width) as i32, 0)
-    }
-
-    pub fn run(&mut self) {
-
     }
 }

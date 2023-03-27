@@ -1,13 +1,14 @@
 use std::{
     thread,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, mpsc},
     time::{Duration, Instant},
 };
 
 use super::util::Coord;
 use super::tetris::Tetris;
 use super::block::Block;
-use super::enums::{ShiftCmd, RotateCmd, BlockID};
+use super::scoreboard::Scoreboard;
+use super::enums::{ShiftCmd, RotateCmd, BlockID, GameStatus};
 
 use eframe;
 use egui::*;
@@ -44,9 +45,15 @@ impl UpdatePeriod {
         Self { period, min_period }
     }
 
-    pub fn decrease_period(&mut self) {
+    fn decrease_period(&mut self) {
         if self.period / 2  > self.min_period {
             self.period /= 2;
+        }
+    }
+
+    pub fn decrease_period_if_score_reached(&mut self, score: usize) {
+        if score > 100 {
+            self.decrease_period();
         }
     }
 
@@ -59,14 +66,16 @@ impl UpdatePeriod {
 
 pub struct TetrisApp {
     // Score of the tetris game
-    score: usize,
+    scoreboard: Arc<Mutex<Scoreboard>>,
 
     // How often the game should tick (in milliseconds, ms)
     period: Arc<Mutex<UpdatePeriod>>,
 
     // State of the board
     game: Arc<Mutex<Tetris>>,
-    game_handle: thread::JoinHandle<()>,
+
+    // Handles to threads to drop when game is finished
+    handles: Vec<thread::JoinHandle<()>>,
 }
 
 impl TetrisApp {
@@ -74,10 +83,17 @@ impl TetrisApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         setup_context(&cc.egui_ctx);
 
-        let period = Arc::new(Mutex::new(UpdatePeriod::new(START_PERIOD, MIN_PERIOD)));
-        let period_arc = Arc::clone(&period);
+        // Creates channels
+        let (tx_tetris_score, rx_tetris_score)   = mpsc::channel();  // Between Tetris and Scoreboard
+        let (tx_period_tetris, rx_period_tetris) = mpsc::channel();  // Between Period and Tetris
+        let (tx_score_period, rx_score_period)   = mpsc::channel();  // Between Scoreboard and Period
 
-        let game = Arc::new(Mutex::new(Tetris::new(10, 20)));
+        // Creates Shared resources
+        let period      = Arc::new(Mutex::new(UpdatePeriod::new(START_PERIOD, MIN_PERIOD)));
+        let scoreboard  = Arc::new(Mutex::new(Scoreboard::new()));
+        let game        = Arc::new(Mutex::new(Tetris::new(10, 20)));
+
+        // Creates Game thread
         let game_arc = Arc::clone(&game);
         let game_handle = thread::spawn(move || {
 
@@ -91,21 +107,48 @@ impl TetrisApp {
                     .unwrap()
                 );
 
+
+                // Order of mutex locks is important to avoid deadlocks.
                 start = Instant::now();                     // Start timer
                 let mut game = game_arc.lock().unwrap();    // Wait for lock
 
-                game.tick();                                // Tick game
+                match game.tick() {                         // Tick game
+                    GameStatus::GameOver => tx_tetris_score.send(0),
+                    GameStatus::Okay     => tx_tetris_score.send(1),
+                };
 
-                let period = period_arc.lock().unwrap();    // Wait for lock
-                sleep_ms = (*period).get_period();
+                // If we have received a new period.
+                if let Ok(period) = rx_period_tetris.try_recv() {
+                    sleep_ms = period;
+                }
+            }
+        });
+
+        // Creates Scoreboard thread
+        let scoreboard_arc = Arc::clone(&scoreboard);
+        let scoreboard_handle = thread::spawn(move || loop {
+            if let Ok(n) = rx_tetris_score.try_recv() {
+                let mut score = scoreboard_arc.lock().unwrap();
+                score.update_score(n);
+                tx_score_period.send(score.get_score());
+            }
+        });
+
+        // Creates Period thread
+        let period_arc = Arc::clone(&period);
+        let period_handle = thread::spawn(move || loop {
+            if let Ok(score) = rx_score_period.try_recv() {
+                let mut period = period_arc.lock().unwrap();
+                period.decrease_period_if_score_reached(score);
+                tx_period_tetris.send(period.get_period());
             }
         });
 
         Self {
-            score: 0,
+            scoreboard,
             period,
             game,
-            game_handle,
+            handles: vec![game_handle, scoreboard_handle, period_handle],
         }
     }
 
@@ -177,6 +220,8 @@ impl eframe::App for TetrisApp {
         if ctx.input(|i| i.key_pressed(Key::K) || i.key_pressed(Key::ArrowUp))      { (*game).rotate_block_if_feasible(&RotateCmd::Left); }
         if ctx.input(|i| i.key_pressed(Key::J) || i.key_pressed(Key::ArrowDown))    { (*game).rotate_block_if_feasible(&RotateCmd::Right); }
 
+        let scoreboard = self.scoreboard.lock().unwrap();
+
         // Scoreboard
         SidePanel::right("side_panel")
             .exact_width(SIDEPANEL_WIDTH)
@@ -185,7 +230,7 @@ impl eframe::App for TetrisApp {
                 ui.vertical_centered(|ui| {
                     ui.label("");
                     ui.label("Score:");
-                    ui.label(format!("{} p", self.score));
+                    ui.label(format!("{} p", scoreboard.get_score()));
                     ui.label("");
                     ui.separator();
                     ui.label("");

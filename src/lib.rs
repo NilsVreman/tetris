@@ -2,6 +2,7 @@ mod util;
 mod enums;
 mod block;
 mod tetris;
+mod scoreboard;
 mod app;
 
 pub use enums::GameStatus;
