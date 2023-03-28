@@ -1,9 +1,6 @@
 // Runs if target architecture is *NOT* wasm32
 #[cfg(not(target_arch = "wasm32"))]
 pub fn main() {
-    //let mut tetris = tetris::TetrisGame::new();
-    //tetris.run();
-
     let options = native_options(tetris::CELL_SIZE);
     eframe::run_native(
         "Tetris",
@@ -15,11 +12,23 @@ pub fn main() {
 // Runs if target architecture is wasm32
 #[cfg(target_arch = "wasm32")]
 pub fn main() {
-    //let mut tetris = tetris::TetrisGame::new();
-    //tetris.run();
-    let app = tetris::TetrisApp::new();
-    let native_options = eframe::NativeOptions::default();
-    eframe
+    // Make sure panics are logged using `console.error`.
+    console_error_panic_hook::set_once();
+
+    // Redirect tracing to console.log and friends:
+    tracing_wasm::set_as_global_default();
+
+    let web_options = eframe::WebOptions::default();
+
+    wasm_bindgen_futures::spawn_local(async {
+        eframe::start_web(
+            "Tetris", // hardcode it
+            web_options,
+            Box::new(|cc| Box::new(tetris::TetrisApp::new(cc))),
+        )
+        .await
+        .expect("failed to start eframe");
+    });
 }
 
 fn native_options(cell_size: f32) -> eframe::NativeOptions {
