@@ -12,7 +12,6 @@ pub struct Tetris {
     boundary: HashSet<Coord>,
     current_block: Block,
     block_generator: BlockGenerator,
-    status: GameStatus,
 }
 
 impl Tetris {
@@ -41,7 +40,6 @@ impl Tetris {
             state: vec![],
             current_block: first_block,
             block_generator: gen,
-            status: GameStatus::Okay,
         }
     }
 
@@ -126,8 +124,12 @@ impl Tetris {
     }
 
     /// todo!()
-    pub fn status(&self) -> &GameStatus {
-        &self.status
+    pub fn status(&self) -> GameStatus {
+        if self.block_collision(&self.current_block) {
+            GameStatus::GameOver
+        } else {
+            GameStatus::Okay
+        }
     }
 
     /// todo!()
@@ -159,12 +161,8 @@ impl Tetris {
                     self.state.push(block_to_add);
                     let num_cleared = self.clear_filled_lines();
 
-                    // If game is over, i.e., if *new* current_block collides with state.
-                    if self.block_collision(&self.current_block) {
-                        self.status = GameStatus::GameOver;
-                    }
                     return Some(num_cleared)
-                } 
+                }
             } else {
                 self.current_block = dropped_block;
             }

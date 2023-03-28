@@ -11,7 +11,7 @@ pub enum RotateCmd {
     Left, Right,
 }
 
-#[derive(Debug)]
+#[derive(PartialEq)]
 pub enum GameStatus {
     Okay,
     GameOver,
