@@ -33,6 +33,15 @@ const COLOR_Z: Color32 = Color32::from_rgb(200, 200, 200);
 const START_PERIOD: u64 = 1024;
 const MIN_PERIOD: u64 = 32;
 const SPEED_UP_LEVEL: usize = 10;
+///////////////////////////////////////
+
+enum GameCmd {
+    RotateLeft,
+    RotateRight,
+    ShiftLeft,
+    ShiftRight,
+    HardDrop,
+}
 
 ///////////////////////////////////////
 
@@ -70,7 +79,7 @@ pub struct TetrisApp {
     game: Arc<Mutex<Tetris>>,
 
     // Handles to threads to drop when game is finished
-    handles: Vec<Option<thread::JoinHandle<()>>>,
+    threads: Vec<Option< (&'static str, thread::JoinHandle<()>) >>,
 }
 
 impl TetrisApp {
@@ -89,7 +98,7 @@ impl TetrisApp {
         let game        = Arc::new(Mutex::new(Tetris::new(10, 20)));
 
         // Creates Game thread
-        let game_arc = Arc::clone(&game);
+        let game_arc    = Arc::clone(&game);
         let game_handle = thread::spawn(move || {
 
             let mut sleep_ms = START_PERIOD;                // Current Period
@@ -107,35 +116,48 @@ impl TetrisApp {
                 start = Instant::now();                     // Start timer
                 let mut game = game_arc.lock().unwrap();    // Wait for lock
 
-                match game.tick() {                         // Tick game
-                    GameStatus::GameOver => tx_tetris_score.send(0),
-                    GameStatus::Okay     => tx_tetris_score.send(1),
-                };
+                // Send num_cleared_lines to score
+                if let Some(n) = game.tick() {              // Tick game
+                    tx_tetris_score.send(n).unwrap();
+                }
 
                 // If we have received a new period.
-                if let Ok(period) = rx_period_tetris.try_recv() {
-                    sleep_ms = period;
-                }
+                let msg = rx_period_tetris.try_recv();
+                if let Ok(period) = msg { sleep_ms = period; }
+
+                // If game is over, break
+                if let GameStatus::GameOver = game.status() { return }
             }
         });
 
         // Creates Scoreboard thread
-        let scoreboard_arc = Arc::clone(&scoreboard);
+        let scoreboard_arc    = Arc::clone(&scoreboard);
         let scoreboard_handle = thread::spawn(move || loop {
-            if let Ok(n) = rx_tetris_score.try_recv() {
+
+            let msg = rx_tetris_score.try_recv();
+            if let Ok(n) = msg {
                 let mut score = scoreboard_arc.lock().unwrap();
                 score.update_score(n);
-                tx_score_period.send(score.get_score());
+                tx_score_period.send(score.get_score()).unwrap();
             }
         });
 
         // Creates Period thread
-        let period_arc = Arc::clone(&period);
-        let period_handle = thread::spawn(move || loop {
-            if let Ok(score) = rx_score_period.try_recv() {
-                let mut period = period_arc.lock().unwrap();
-                period.decrease_period_if_score_reached(score);
-                tx_period_tetris.send(period.get_period());
+        let period_arc    = Arc::clone(&period);
+        let period_handle = thread::spawn(move || {
+
+            let mut speed_up_level = (SPEED_UP_LEVEL..10*SPEED_UP_LEVEL).step_by(SPEED_UP_LEVEL);
+            let mut next_level = speed_up_level.next().unwrap();
+            loop {
+                let msg = rx_score_period.try_recv();
+                if let Ok(score) = msg {
+                    if score > next_level {
+                        next_level = speed_up_level.next().unwrap();
+                        let mut period = period_arc.lock().unwrap();
+                        period.decrease_period();
+                        tx_period_tetris.send(period.get_period());
+                    }
+                }
             }
         });
 
@@ -143,7 +165,11 @@ impl TetrisApp {
             scoreboard,
             period,
             game,
-            handles: vec![game_handle, scoreboard_handle, period_handle],
+            threads: vec![
+                Some(("game", game_handle)),
+                Some(("scoreboard", scoreboard_handle)),
+                Some(("period", period_handle))
+            ],
         }
     }
 
@@ -198,12 +224,21 @@ impl TetrisApp {
     }
 }
 
+impl Drop for TetrisApp {
+    fn drop(&mut self) {
+        for thread in &mut self.threads {
+            if let Some((id, handle)) = thread.take() {
+                println!("Shutting down thread: {}", id);
+                handle.join().unwrap();
+            }
+        }
+    }
+}
+
 impl eframe::App for TetrisApp {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
         // Close
-        if ctx.input(|i| i.key_pressed(Key::Escape) || i.key_pressed(Key::Q)) {
-            _frame.close()
-        }
+        if ctx.input(|i| i.key_pressed(Key::Escape) || i.key_pressed(Key::Q))       { _frame.close(); }
 
         let mut game = self.game.lock().unwrap();
         let mut num_cleared_lines = 0;
@@ -247,13 +282,10 @@ impl eframe::App for TetrisApp {
             });
 
         // If game is over
-        if let GameStatus::GameOver = game.status() {
-            _frame.close();
-        }
 
         // Sleep until request repaint or repaint at once if there exists other repaint requests
-        let period = (*self.period.lock().unwrap()).get_period();
-        ctx.request_repaint_after(Duration::from_millis(period));
+        let p = self.period.lock().unwrap();
+        ctx.request_repaint_after(Duration::from_millis(p.get_period()));
     }
 }
 
