@@ -12,6 +12,7 @@ pub struct Tetris {
     boundary: HashSet<Coord>,
     current_block: Block,
     block_generator: BlockGenerator,
+    status: GameStatus,
 }
 
 impl Tetris {
@@ -40,6 +41,7 @@ impl Tetris {
             state: vec![],
             current_block: first_block,
             block_generator: gen,
+            status: GameStatus::Okay,
         }
     }
 
@@ -85,20 +87,22 @@ impl Tetris {
     }
 
     // Clears all filled lines and removes the blocks that are now empty from our state
-    fn clear_filled_lines(&mut self) {
-        let mut any_cleared = false;
+    fn clear_filled_lines(&mut self) -> usize {
+        let mut num_cleared = 0;
 
         for line in 0..(self.height as usize) {
             if self.is_line_full(line) {
-                any_cleared = true;
+                num_cleared += 1;
                 self.clear_line(line);
             }
         }
 
         // Removes all blocks that were fully cleared
-        if any_cleared { 
+        if num_cleared > 0 {
             self.state.retain(|block| !block.is_fully_cleared());
         }
+
+        num_cleared
     }
 
     /// todo!()
@@ -122,18 +126,24 @@ impl Tetris {
     }
 
     /// todo!()
+    pub fn status(&self) -> &GameStatus {
+        &self.status
+    }
+
+    /// todo!()
     /// returns whether the game is lost or not
-    pub fn tick(&mut self) -> GameStatus {
+    pub fn tick(&mut self) -> Option<usize> {
         self.drop_n(1)
     }
 
     /// todo!()
-    pub fn hard_drop(&mut self) -> GameStatus {
+    pub fn hard_drop(&mut self) -> Option<usize> {
         self.drop_n(self.height+2)
     }
 
     // aux function for tick and hard_drop (n = how many blocks we should drop maximally)
-    fn drop_n(&mut self, n: i32) -> GameStatus {
+    fn drop_n(&mut self, n: i32) -> Option<usize> {
+        assert!(n > 0);
         for _ in 0..n { // how many drops we should perform
 
             let dropped_block = self.current_block.drop_one();
@@ -147,18 +157,19 @@ impl Tetris {
                     let next_block = self.center_block(&next_block);
                     let block_to_add = mem::replace(&mut self.current_block, next_block);
                     self.state.push(block_to_add);
-                    self.clear_filled_lines();
-                    // TODO: Return how many lines where cleared <25-03-23> //
+                    let num_cleared = self.clear_filled_lines();
 
                     // If game is over, i.e., if *new* current_block collides with state.
-                    if self.block_collision(&self.current_block) { return GameStatus::GameOver }
-                    else { return GameStatus::Okay }
+                    if self.block_collision(&self.current_block) {
+                        self.status = GameStatus::GameOver;
+                    }
+                    return Some(num_cleared)
                 } 
             } else {
                 self.current_block = dropped_block;
             }
         }
-        GameStatus::Okay
+        None
     }
 
     fn center_block(&self, block: &Block) -> Block {

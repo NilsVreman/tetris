@@ -177,16 +177,7 @@ impl Iterator for BlockGenerator {
     type Item = Block;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let ele = match self.idx {
-            0 => Some(Block::new(BlockID::I)),
-            1 => Some(Block::new(BlockID::J)),
-            2 => Some(Block::new(BlockID::L)),
-            3 => Some(Block::new(BlockID::O)),
-            4 => Some(Block::new(BlockID::S)),
-            5 => Some(Block::new(BlockID::T)),
-            6 => Some(Block::new(BlockID::Z)),
-            _ => None,
-        };
+        let ele = self.peek_next();
         self.idx = (self.idx + 1) % 7;
         ele
     }

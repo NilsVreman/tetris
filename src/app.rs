@@ -22,16 +22,17 @@ pub const CELL_SIZE: f32 = 30.0;
 const CELL: Rect = Rect { min: pos2(0.0, 0.0), max: pos2(CELL_SIZE, CELL_SIZE) };
 
 const COLOR_WALL: Color32 = Color32::WHITE;
-const COLOR_I: Color32 = Color32::from_rgb(250, 200, 200);
-const COLOR_J: Color32 = Color32::from_rgb(200, 250, 200);
-const COLOR_L: Color32 = Color32::from_rgb(200, 200, 250);
-const COLOR_O: Color32 = Color32::from_rgb(250, 250, 200);
-const COLOR_S: Color32 = Color32::from_rgb(250, 200, 250);
-const COLOR_T: Color32 = Color32::from_rgb(200, 250, 250);
-const COLOR_Z: Color32 = Color32::from_rgb(250, 250, 250);
+const COLOR_I: Color32 = Color32::from_rgb(200, 150, 150);
+const COLOR_J: Color32 = Color32::from_rgb(150, 200, 150);
+const COLOR_L: Color32 = Color32::from_rgb(150, 150, 200);
+const COLOR_O: Color32 = Color32::from_rgb(200, 200, 150);
+const COLOR_S: Color32 = Color32::from_rgb(200, 150, 200);
+const COLOR_T: Color32 = Color32::from_rgb(150, 200, 200);
+const COLOR_Z: Color32 = Color32::from_rgb(200, 200, 200);
 
-const START_PERIOD: u64 = 800;
-const MIN_PERIOD: u64 = 50;
+const START_PERIOD: u64 = 1024;
+const MIN_PERIOD: u64 = 32;
+const SPEED_UP_LEVEL: usize = 10;
 
 ///////////////////////////////////////
 
@@ -45,15 +46,9 @@ impl UpdatePeriod {
         Self { period, min_period }
     }
 
-    fn decrease_period(&mut self) {
+    pub fn decrease_period(&mut self) {
         if self.period / 2  > self.min_period {
             self.period /= 2;
-        }
-    }
-
-    pub fn decrease_period_if_score_reached(&mut self, score: usize) {
-        if score > 100 {
-            self.decrease_period();
         }
     }
 
@@ -75,7 +70,7 @@ pub struct TetrisApp {
     game: Arc<Mutex<Tetris>>,
 
     // Handles to threads to drop when game is finished
-    handles: Vec<thread::JoinHandle<()>>,
+    handles: Vec<Option<thread::JoinHandle<()>>>,
 }
 
 impl TetrisApp {
@@ -205,22 +200,27 @@ impl TetrisApp {
 
 impl eframe::App for TetrisApp {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
-        println!("Update");
         // Close
         if ctx.input(|i| i.key_pressed(Key::Escape) || i.key_pressed(Key::Q)) {
             _frame.close()
         }
 
         let mut game = self.game.lock().unwrap();
+        let mut num_cleared_lines = 0;
 
         // Commands
-        if ctx.input(|i| i.key_pressed(Key::Space))                                 { (*game).hard_drop(); }
-        if ctx.input(|i| i.key_pressed(Key::H) || i.key_pressed(Key::ArrowLeft))    { (*game).shift_block_if_feasible(&ShiftCmd::Left); }
-        if ctx.input(|i| i.key_pressed(Key::L) || i.key_pressed(Key::ArrowRight))   { (*game).shift_block_if_feasible(&ShiftCmd::Right); }
-        if ctx.input(|i| i.key_pressed(Key::K) || i.key_pressed(Key::ArrowUp))      { (*game).rotate_block_if_feasible(&RotateCmd::Left); }
-        if ctx.input(|i| i.key_pressed(Key::J) || i.key_pressed(Key::ArrowDown))    { (*game).rotate_block_if_feasible(&RotateCmd::Right); }
+        if ctx.input(|i| i.key_pressed(Key::Space)) {
+            if let Some(n) = game.hard_drop() {
+                num_cleared_lines = n;
+            }
+        }
+        if ctx.input(|i| i.key_pressed(Key::H) || i.key_pressed(Key::ArrowLeft))    { game.shift_block_if_feasible(&ShiftCmd::Left); }
+        if ctx.input(|i| i.key_pressed(Key::L) || i.key_pressed(Key::ArrowRight))   { game.shift_block_if_feasible(&ShiftCmd::Right); }
+        if ctx.input(|i| i.key_pressed(Key::K) || i.key_pressed(Key::ArrowUp))      { game.rotate_block_if_feasible(&RotateCmd::Left); }
+        if ctx.input(|i| i.key_pressed(Key::J) || i.key_pressed(Key::ArrowDown))    { game.rotate_block_if_feasible(&RotateCmd::Right); }
 
-        let scoreboard = self.scoreboard.lock().unwrap();
+        let mut scoreboard = self.scoreboard.lock().unwrap();
+        scoreboard.update_score(num_cleared_lines); // If we cleared lines based on hard_drop, update score
 
         // Scoreboard
         SidePanel::right("side_panel")
@@ -241,10 +241,15 @@ impl eframe::App for TetrisApp {
         // Tetris field
         CentralPanel::default()
             .show(ctx, |ui| {
-                Self::paint_boundary(ui.painter(), (*game).boundary_config());
-                Self::paint_state(ui.painter(), (*game).state_config());
+                Self::paint_boundary(ui.painter(), game.boundary_config());
+                Self::paint_state(ui.painter(), game.state_config());
                 Self::paint_block(ui.painter(), &(*game).current_block());
             });
+
+        // If game is over
+        if let GameStatus::GameOver = game.status() {
+            _frame.close();
+        }
 
         // Sleep until request repaint or repaint at once if there exists other repaint requests
         let period = (*self.period.lock().unwrap()).get_period();
