@@ -1,4 +1,5 @@
 #![warn(clippy::all, rust_2018_idioms)]
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 const GAME_WIDTH: i32 = 10;
 const GAME_HEIGHT: i32 = 20;
