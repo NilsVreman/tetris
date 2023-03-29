@@ -79,7 +79,7 @@ pub struct TetrisApp {
 
 impl TetrisApp {
 
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>, width: i32, height: i32) -> Self {
 
         // Setup font of context
         setup_context(&cc.egui_ctx);
@@ -92,7 +92,7 @@ impl TetrisApp {
         // Creates Shared resources
         let period      = Arc::new(Mutex::new(UpdatePeriod::new(START_PERIOD, MIN_PERIOD)));
         let scoreboard  = Arc::new(Mutex::new(Scoreboard::new()));
-        let game        = Arc::new(Mutex::new(Tetris::new(10, 20)));
+        let game        = Arc::new(Mutex::new(Tetris::new(width, height)));
         let status      = Arc::new(Mutex::new(GameStatus::Okay));
 
         // Creates Game thread
@@ -283,6 +283,7 @@ impl eframe::App for TetrisApp {
         let mut game = self.game.lock().unwrap();
 
         // Close
+        #[cfg(not(target_arch = "wasm32"))]
         if ctx.input(|i| i.key_pressed(Key::Escape) || i.key_pressed(Key::Q))
             || game.status() == GameStatus::GameOver
         {
