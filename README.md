@@ -17,6 +17,15 @@ Triple line: 7 p
 Tetris:      13 p
 ```
 
+## TODO:
+* Mention installation process:
+    1. sudo dnf ...
+    2. .cargo file and that it is appended to cargo commands
+    3. #dev thingy
+    4. how to host it locally
+    5. How to run in natively.
+    6. other?
+
 
 ## Rotation Scheme
 

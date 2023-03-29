@@ -4,14 +4,13 @@ use super::block::Block;
 use super::scoreboard::Scoreboard;
 use super::enums::{ShiftCmd, RotateCmd, BlockID};
 
+use chrono;
+
 use eframe;
 use egui::*;
 
 #[cfg(not(target_arch = "wasm32"))]
 use super::enums::GameStatus;
-
-#[cfg(target_arch = "wasm32")]
-use chrono::Timelike;
 
 // ------------------------------------------------------------------------------------------------
 
@@ -124,13 +123,13 @@ impl TetrisApp {
     }
 
     // Paint the state config of the tetris game
-    fn paint_state<'a>(&self, painter: &egui::Painter) {
+    fn paint_state(&self, painter: &egui::Painter) {
         self.game.state_config()
             .for_each(|block| Self::paint_block(&painter, block));
     }
 
     // Paint the walls (boundary) of the tetris game
-    fn paint_boundary<'a>(&self, painter: &egui::Painter) {
+    fn paint_boundary(&self, painter: &egui::Painter) {
         self.game.boundary_config()
             .for_each(|&coord| Self::paint_coord(&painter, CELL_SIZE * coord, &COLOR_WALL));
     }
