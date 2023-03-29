@@ -9,17 +9,18 @@ authors = ["Nils Vreman <nils.vreman@gmail.com>"]
 [dependencies]
 eframe = "0.21"
 egui = "0.21"
+chrono = { version = "0.4", features = ["js-sys", "wasmbind"] }
 
 # Web:
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.7"
 tracing-wasm = "0.2"
-wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
 
 
+# Optimization level for different profiles
 [profile.release]
 opt-level = 2
 
-# Optimize all dependencies even in debug builds:
 [profile.dev]
 opt-level = 2

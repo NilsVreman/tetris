@@ -1,24 +1,27 @@
-use std::{
-    thread,
-    sync::{Arc, Mutex, mpsc},
-    time::{Duration, Instant},
-};
-
 use super::util::Coord;
 use super::tetris::Tetris;
 use super::block::Block;
 use super::scoreboard::Scoreboard;
-use super::enums::{ShiftCmd, RotateCmd, BlockID, GameStatus};
+use super::enums::{ShiftCmd, RotateCmd, BlockID};
 
 use eframe;
 use egui::*;
 
-const SIDEPANEL_WIDTH: f32 = 250.0;
+#[cfg(not(target_arch = "wasm32"))]
+use super::enums::GameStatus;
+
+#[cfg(target_arch = "wasm32")]
+use chrono::Timelike;
+
+// ------------------------------------------------------------------------------------------------
+
+pub const CELL_SIZE: f32 = 30.0;
+pub const SIDEPANEL_WIDTH: f32 = 250.0;
+
 const STROKE_WIDTH: f32 = 2.0;
 const STROKE: Stroke = Stroke { width: STROKE_WIDTH, color: Color32::BLACK };
 const ROUNDING_PX: f32 = 2.0;
 const ROUNDING: Rounding = Rounding { nw: ROUNDING_PX, ne: ROUNDING_PX, sw: ROUNDING_PX, se: ROUNDING_PX, };
-pub const CELL_SIZE: f32 = 30.0;
 const CELL: Rect = Rect { min: pos2(0.0, 0.0), max: pos2(CELL_SIZE, CELL_SIZE) };
 
 const COLOR_WALL: Color32 = Color32::WHITE;
@@ -30,51 +33,79 @@ const COLOR_S: Color32 = Color32::from_rgb(200, 150, 200);
 const COLOR_T: Color32 = Color32::from_rgb(150, 200, 200);
 const COLOR_Z: Color32 = Color32::from_rgb(200, 200, 200);
 
-const START_PERIOD: u64 = 1024;
-const MIN_PERIOD: u64 = 32;
-const SPEED_UP_LEVEL: usize = 10;
+const START_PERIOD: i64 = 1024;
+const MIN_PERIOD: i64 = 32;
+const SPEED_UP_LEVEL: i64 = 10;
 
-///////////////////////////////////////
+// ------------------------------------------------------------------------------------------------
 
-struct UpdatePeriod {
-    min_period: u64,
-    period: u64,  // Update frequency in milliseconds (ms)
+struct TickPeriod {
+    min_period: i64,
+    period: i64,  // Update frequency in milliseconds (ms)
+    next_level: i64,
 }
 
-impl UpdatePeriod {
-    pub fn new(period: u64, min_period: u64) -> Self {
-        Self { period, min_period }
+impl TickPeriod {
+    fn new(period: i64, min_period: i64) -> Self {
+        Self { period, min_period, next_level: SPEED_UP_LEVEL }
     }
 
-    pub fn decrease_period(&mut self) {
+    fn decrease_period(&mut self) {
         if self.period / 2  > self.min_period {
             self.period /= 2;
         }
     }
 
-    pub fn get_period(&self) -> u64 {
+    fn update_period_from_score(&mut self, score: usize) {
+        if score as i64 >= self.next_level {
+            self.next_level += SPEED_UP_LEVEL;
+            self.decrease_period();
+        }
+    }
+
+    fn get_period(&self) -> i64 {
         self.period
     }
 }
 
-///////////////////////////////////////
+struct TickTimer {
+    period: TickPeriod,
+    time: i64,
+}
+
+impl TickTimer {
+    fn new() -> Self {
+        let time = chrono::Local::now().timestamp_millis();
+        Self {
+            period: TickPeriod::new(START_PERIOD, MIN_PERIOD),
+            time
+        }
+    }
+
+    fn update_period_from_score(&mut self, score: usize) {
+        self.period.update_period_from_score(score);
+    }
+
+    fn get_time_until_tick(&self) -> i64 {
+        (self.time + self.period.get_period()) - chrono::Local::now().timestamp_millis()
+    }
+
+    fn reset_tick(&mut self) {
+        self.time = chrono::Local::now().timestamp_millis();
+    }
+}
+
+// ------------------------------------------------------------------------------------------------
 
 pub struct TetrisApp {
     // Score of the tetris game
-    scoreboard: Arc<Mutex<Scoreboard>>,
-    score_ch: Option<mpsc::Sender<usize>>,
+    scoreboard: Scoreboard,
 
     // How often the game should tick (in milliseconds, ms)
-    period: Arc<Mutex<UpdatePeriod>>,
+    timer: TickTimer,
 
     // State of the board
-    game: Arc<Mutex<Tetris>>,
-
-    // Game Over
-    status: Arc<Mutex<GameStatus>>,
-
-    // Handles to threads to drop when game is finished
-    threads: Vec<Option< (&'static str, thread::JoinHandle<()>) >>,
+    game: Tetris,
 }
 
 impl TetrisApp {
@@ -84,123 +115,24 @@ impl TetrisApp {
         // Setup font of context
         setup_context(&cc.egui_ctx);
 
-        // Creates channels
-        let (tx_tetris_score, rx_tetris_score)   = mpsc::channel();  // Between Tetris and Scoreboard
-        let (tx_period_tetris, rx_period_tetris) = mpsc::channel();  // Between Period and Tetris
-        let (tx_score_period, rx_score_period)   = mpsc::channel();  // Between Scoreboard and Period
+        // Creates resources
+        let timer       = TickTimer::new();
+        let scoreboard  = Scoreboard::new();
+        let game        = Tetris::new(width, height);
 
-        // Creates Shared resources
-        let period      = Arc::new(Mutex::new(UpdatePeriod::new(START_PERIOD, MIN_PERIOD)));
-        let scoreboard  = Arc::new(Mutex::new(Scoreboard::new()));
-        let game        = Arc::new(Mutex::new(Tetris::new(width, height)));
-        let status      = Arc::new(Mutex::new(GameStatus::Okay));
-
-        // Creates Game thread
-        let tx_tetris_score_2 = tx_tetris_score.clone();
-        let status_arc = Arc::clone(&status);
-        let game_arc    = Arc::clone(&game);
-        let game_handle = thread::spawn(move || {
-
-            let mut sleep_ms = START_PERIOD;                // Current Period
-            let mut start = Instant::now();                 // Start timer
-            loop {
-
-                thread::sleep(                              // Sleep until period
-                    Duration::from_millis(sleep_ms)
-                    .checked_sub(start.elapsed())
-                    .unwrap()
-                );
-
-                // Order of mutex locks is important to avoid deadlocks.
-                start = Instant::now();                     // Start timer
-                let mut game = game_arc.lock().unwrap();    // Wait for lock
-
-                // Send num_cleared_lines to score
-                if let Some(num_cleared) = game.tick() {    // Tick game
-                    tx_tetris_score_2.send(num_cleared).unwrap();
-                }
-
-                // If game is over, break
-                if let GameStatus::GameOver = game.status() {
-                    drop(tx_tetris_score_2);
-                    return
-                };
-                let status = status_arc.lock().unwrap();
-                if let GameStatus::GameOver = *status {
-                    drop(tx_tetris_score_2);
-                    return
-                }
-
-                // If we have received a new period.
-                let msg = rx_period_tetris.try_recv();
-                if let Ok(period) = msg { sleep_ms = period; }
-            }
-        });
-
-        // Creates Scoreboard thread
-        let scoreboard_arc    = Arc::clone(&scoreboard);
-        let scoreboard_handle = thread::spawn(move || loop {
-            // Wait for message
-            let msg = rx_tetris_score.recv();
-            match msg {
-                Ok(n) => { // If all is okay, update scoreboard and send score over channel
-                    let mut score = scoreboard_arc.lock().unwrap();
-                    score.update_score(n);
-                    tx_score_period.send(score.get_score()).unwrap();
-                },
-                Err(_) => { // If something is wrong, drop channel handle and return
-                    drop(tx_score_period);
-                    return;
-                }
-            }
-        });
-
-        // Creates Period thread
-        let period_arc    = Arc::clone(&period);
-        let period_handle = thread::spawn(move || {
-            // The function determining speed based on the score
-            let mut speed_up_level = (SPEED_UP_LEVEL..10*SPEED_UP_LEVEL).step_by(SPEED_UP_LEVEL);
-            let mut next_level = speed_up_level.next().unwrap();
-            loop {
-                // Wait for msg
-                let msg = rx_score_period.recv();
-                match msg {
-                    Ok(score) => if score > next_level { // If all is okay and score is above speedup level, speed up and transmit new period to Tetris thread
-                        next_level = speed_up_level.next().unwrap();
-                        let mut period = period_arc.lock().unwrap();
-                        period.decrease_period();
-                        tx_period_tetris.send(period.get_period()).unwrap();
-                    },
-                    Err(_) => { // If something is wrong, drop channel handle and return
-                        drop(tx_period_tetris);
-                        return;
-                    }
-                }
-            }
-        });
-
-        Self {
-            scoreboard,
-            score_ch: Some(tx_tetris_score),
-            period,
-            game,
-            status,
-            threads: vec![
-                Some(("game", game_handle)),
-                Some(("scoreboard", scoreboard_handle)),
-                Some(("period", period_handle))
-            ],
-        }
+        Self { scoreboard, timer, game }
     }
 
     // Paint the state config of the tetris game
-    fn paint_state<'a>(painter: &egui::Painter, state_config: impl Iterator<Item=&'a Block>) {
-        state_config.for_each(|block| Self::paint_block(&painter, block));
+    fn paint_state<'a>(&self, painter: &egui::Painter) {
+        self.game.state_config()
+            .for_each(|block| Self::paint_block(&painter, block));
     }
 
     // Paint the walls (boundary) of the tetris game
-    fn paint_boundary<'a>(painter: &egui::Painter, boundary_config: impl Iterator<Item=&'a Coord>) {
-        boundary_config.for_each(|&coord| Self::paint_coord(&painter, CELL_SIZE * coord, &COLOR_WALL));
+    fn paint_boundary<'a>(&self, painter: &egui::Painter) {
+        self.game.boundary_config()
+            .for_each(|&coord| Self::paint_coord(&painter, CELL_SIZE * coord, &COLOR_WALL));
     }
 
     // Paint a block 
@@ -248,62 +180,39 @@ impl TetrisApp {
             BlockID::Z => &COLOR_Z,
         }
     }
-
-    fn game_over(&mut self) {
-        // Set gameover to true
-        let mut status = self.status.lock().unwrap();
-        *status = GameStatus::GameOver;
-
-        // Drop score channel
-        if let Some(ref mut ch) = self.score_ch.take() { drop(ch); }
-    }
 }
 
-// Graceful shutdown of the tetris app
-impl Drop for TetrisApp {
-    fn drop(&mut self) {
-
-        // Set status of tetris app to GameOver
-        self.game_over();
-
-        // Shut down each thread
-        for thread in &mut self.threads {
-            if let Some((id, handle)) = thread.take() {
-                println!("Shutting down thread: {}", id);
-                handle.join().unwrap();
-            }
-        }
-    }
-}
 
 impl eframe::App for TetrisApp {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
 
-        // Take game mutex
-        let mut game = self.game.lock().unwrap();
-
         // Close
         #[cfg(not(target_arch = "wasm32"))]
         if ctx.input(|i| i.key_pressed(Key::Escape) || i.key_pressed(Key::Q))
-            || game.status() == GameStatus::GameOver
+            || self.game.status() == GameStatus::GameOver
         {
             _frame.close();
         }
 
         // User Commands
         if ctx.input(|i| i.key_pressed(Key::Space)) {
-            if let Some(n) = game.hard_drop() {
+            if let Some(num_cleared) = self.game.hard_drop() {
                 // Send how many lines were cleared to the scoreboard
-                self.score_ch.as_ref().unwrap().send(n).unwrap();
+                self.scoreboard.update_score(num_cleared);
+                self.timer.update_period_from_score(self.scoreboard.get_score());
             }
         }
-        if ctx.input(|i| i.key_pressed(Key::H) || i.key_pressed(Key::ArrowLeft))    { game.shift_block_if_feasible(&ShiftCmd::Left); }
-        if ctx.input(|i| i.key_pressed(Key::L) || i.key_pressed(Key::ArrowRight))   { game.shift_block_if_feasible(&ShiftCmd::Right); }
-        if ctx.input(|i| i.key_pressed(Key::K) || i.key_pressed(Key::ArrowUp))      { game.rotate_block_if_feasible(&RotateCmd::Left); }
-        if ctx.input(|i| i.key_pressed(Key::J) || i.key_pressed(Key::ArrowDown))    { game.rotate_block_if_feasible(&RotateCmd::Right); }
+        if ctx.input(|i| i.key_pressed(Key::H) || i.key_pressed(Key::ArrowLeft))  { self.game.shift_block_if_feasible(&ShiftCmd::Left); }
+        if ctx.input(|i| i.key_pressed(Key::L) || i.key_pressed(Key::ArrowRight)) { self.game.shift_block_if_feasible(&ShiftCmd::Right); }
+        if ctx.input(|i| i.key_pressed(Key::K) || i.key_pressed(Key::ArrowUp))    { self.game.rotate_block_if_feasible(&RotateCmd::Left); }
+        if ctx.input(|i| i.key_pressed(Key::J) || i.key_pressed(Key::ArrowDown))  { self.game.rotate_block_if_feasible(&RotateCmd::Right); }
 
-        // Take the scoreboard as mutex
-        let scoreboard = self.scoreboard.lock().unwrap();
+        // Update tick
+        if self.timer.get_time_until_tick() <= 0 {
+            println!("########## {}", self.timer.get_time_until_tick());
+            self.game.tick();
+            self.timer.reset_tick();
+        }
 
         // Update right hand side of gui
         SidePanel::right("side_panel")
@@ -313,25 +222,24 @@ impl eframe::App for TetrisApp {
                 ui.vertical_centered(|ui| {
                     ui.label("");
                     ui.label("Score:");
-                    ui.label(format!("{} p", scoreboard.get_score()));
+                    ui.label(format!("{} p", self.scoreboard.get_score()));
                     ui.label("");
                     ui.separator();
                     ui.label("");
-                    Self::paint_next_block(ui.painter(), &(*game).peek_next_block(), &ui.next_widget_position());
+                    Self::paint_next_block(ui.painter(), &self.game.peek_next_block(), &ui.next_widget_position());
                 });
             });
 
         // Paint tetris field
         CentralPanel::default()
             .show(ctx, |ui| {
-                Self::paint_boundary(ui.painter(), game.boundary_config());
-                Self::paint_state(ui.painter(), game.state_config());
-                Self::paint_block(ui.painter(), &(*game).current_block());
+                self.paint_boundary(ui.painter());
+                self.paint_state(ui.painter());
+                Self::paint_block(ui.painter(), &self.game.current_block());
             });
 
         // Sleep until request repaint or repaint at once if there exists other repaint requests
-        let p = self.period.lock().unwrap();
-        ctx.request_repaint_after(Duration::from_millis(p.get_period()));
+        ctx.request_repaint();
     }
 }
 
@@ -347,5 +255,3 @@ fn setup_context(ctx: &Context) {
     ].into();
     ctx.set_style(style);
 }
-
-///////////////////////////////////////
