@@ -6,7 +6,7 @@ use super::timer::TickTimer;
 use super::enums::{ShiftCmd, RotateCmd, BlockID, GameStatus};
 
 use eframe;
-use egui::*;
+use egui::{self, Key, Color32};
 
 // ------------------------------------------------------------------------------------------------
 // Game constants
@@ -15,10 +15,10 @@ pub const CELL_SIZE: f32 = 30.0;
 pub const SIDEPANEL_WIDTH: f32 = 250.0;
 
 const STROKE_WIDTH: f32 = 2.0;
-const STROKE: Stroke = Stroke { width: STROKE_WIDTH, color: Color32::BLACK };
 const ROUNDING_PX: f32 = 2.0;
-const ROUNDING: Rounding = Rounding { nw: ROUNDING_PX, ne: ROUNDING_PX, sw: ROUNDING_PX, se: ROUNDING_PX, };
-const CELL: Rect = Rect { min: pos2(0.0, 0.0), max: pos2(CELL_SIZE, CELL_SIZE) };
+const STROKE: egui::Stroke      = egui::Stroke { width: STROKE_WIDTH, color: Color32::BLACK };
+const ROUNDING: egui::Rounding  = egui::Rounding { nw: ROUNDING_PX, ne: ROUNDING_PX, sw: ROUNDING_PX, se: ROUNDING_PX, };
+const CELL: egui::Rect          = egui::Rect { min: egui::pos2(0.0, 0.0), max: egui::pos2(CELL_SIZE, CELL_SIZE) };
 
 const COLOR_WALL: Color32 = Color32::WHITE;
 const COLOR_I: Color32 = Color32::from_rgb(200, 150, 150);
@@ -45,6 +45,10 @@ pub struct TetrisApp {
 
     // State of the board
     game: Tetris,
+
+    // Game size
+    width: i32,
+    height: i32,
 }
 
 impl TetrisApp {
@@ -60,30 +64,38 @@ impl TetrisApp {
         let scoreboard  = Scoreboard::new();
         let game        = Tetris::new(width, height);
 
-        Self { scoreboard, timer, game }
+        Self { scoreboard, timer, game, width, height }
     }
 
     /// todo!()
-    pub fn handle_user_input(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
+    /// Handles user input that affect the tetris app state
+    fn handle_user_input_app(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Close
         #[cfg(not(target_arch = "wasm32"))]
         if ctx.input(|i| i.key_pressed(Key::Escape) || i.key_pressed(Key::Q)) {
             _frame.close();
         }
 
+        if ctx.input(|i| i.key_pressed(Key::R)) { self.reset(); }
+    }
+
+    /// todo!()
+    /// Handles user input that affect the tetris game state
+    fn handle_user_input_game(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // User Commands
         if ctx.input(|i| i.key_pressed(Key::Space)) {
             if let Some(num_lines_cleared) = self.game.hard_drop() {
                 self.update_score_and_tickrate(num_lines_cleared);
             }
         }
-        if ctx.input(|i| i.key_pressed(Key::H) || i.key_pressed(Key::ArrowLeft))  { self.game.shift_block_if_feasible(&ShiftCmd::Left); }
-        if ctx.input(|i| i.key_pressed(Key::L) || i.key_pressed(Key::ArrowRight)) { self.game.shift_block_if_feasible(&ShiftCmd::Right); }
-        if ctx.input(|i| i.key_pressed(Key::K) || i.key_pressed(Key::ArrowUp))    { self.game.rotate_block_if_feasible(&RotateCmd::Left); }
-        if ctx.input(|i| i.key_pressed(Key::J) || i.key_pressed(Key::ArrowDown))  { self.game.rotate_block_if_feasible(&RotateCmd::Right); }
+        if ctx.input(|i| i.key_pressed(Key::H) || i.key_pressed(Key::ArrowLeft))    { self.game.shift_block_if_feasible(&ShiftCmd::Left); }
+        if ctx.input(|i| i.key_pressed(Key::L) || i.key_pressed(Key::ArrowRight))   { self.game.shift_block_if_feasible(&ShiftCmd::Right); }
+        if ctx.input(|i| i.key_pressed(Key::K) || i.key_pressed(Key::ArrowUp))      { self.game.rotate_block_if_feasible(&RotateCmd::Left); }
+        if ctx.input(|i| i.key_pressed(Key::J) || i.key_pressed(Key::ArrowDown))    { self.game.rotate_block_if_feasible(&RotateCmd::Right); }
     }
 
-    pub fn tick(&mut self) {
+    /// todo!()
+    fn tick(&mut self) {
         if self.timer.get_time_until_tick() <= 0 {
             if let Some(num_lines_cleared) = self.game.tick() {
                 self.update_score_and_tickrate(num_lines_cleared);
@@ -92,8 +104,12 @@ impl TetrisApp {
         }
     }
 
-    pub fn game_status(&self) -> GameStatus {
-        self.game.status()
+    /// todo!()
+    fn reset(&mut self) {
+        // Creates resources
+        self.timer      = TickTimer::new(START_PERIOD, MIN_PERIOD, LVL_UP);
+        self.scoreboard = Scoreboard::new();
+        self.game       = Tetris::new(self.width, self.height);
     }
 
     // Send how many lines were cleared to the scoreboard
@@ -119,25 +135,22 @@ impl TetrisApp {
 // Gui loop
 
 impl eframe::App for TetrisApp {
-    fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
 
-        // If GameOver
-        if let GameStatus::GameOver = self.game_status() {
-            #[cfg(not(target_arch = "wasm32"))]
-            _frame.close();
+        // Alter app state based on user input
+        self.handle_user_input_app(&ctx, _frame);
 
-            //#[cfg(target_arch = "wasm32")]
-            // TODO: Add functionality for GameOver in WASM //
+        // If we are still able to play
+        if let GameStatus::Okay = self.game.status() {
+            // Alter tetris state based on user input
+            self.handle_user_input_game(&ctx, _frame);
+
+            // Update tick
+            self.tick();
         }
 
-        // Alter tetris state based on user input
-        self.handle_user_input(&ctx, _frame);
-
-        // Update tick
-        self.tick();
-
         // Update right hand side of gui
-        SidePanel::right("side_panel")
+        egui::SidePanel::right("side_panel")
             .exact_width(SIDEPANEL_WIDTH)
             .resizable(false)
             .show(ctx, |ui| {
@@ -148,17 +161,31 @@ impl eframe::App for TetrisApp {
                     ui.label("");
                     ui.separator();
                     ui.label("");
-                    paint_next_block(ui.painter(), &self.game.peek_next_block(), &ui.next_widget_position());
+                    if let GameStatus::Okay = self.game.status() {
+                        paint_next_block(ui.painter(), &self.game.peek_next_block(), &ui.next_widget_position());
+                    };
                 });
             });
 
         // Paint tetris field
-        CentralPanel::default()
+        egui::CentralPanel::default()
             .show(ctx, |ui| {
                 self.paint_boundary(ui.painter());
                 self.paint_state(ui.painter());
-                paint_block(ui.painter(), &self.game.current_block());
+                if let GameStatus::Okay = self.game.status() {
+                    paint_block(ui.painter(), &self.game.current_block());
+                };
             });
+
+        // If game is over print popup
+        if let GameStatus::GameOver = self.game.status() {
+            egui::Window::new("Game Over!")
+                .collapsible(false)
+                .resizable(false)
+                .show(ctx, |ui| {
+                    ui.label(format!("Final score: {} p", self.scoreboard.get_score()));
+                });
+        };
 
         // Sleep until request repaint or repaint at once if there exists other repaint requests
         let time = self.timer.get_time_until_tick();
@@ -182,7 +209,7 @@ fn paint_block(painter: &egui::Painter, block: &Block) {
 }
 
 // paint the next block that is gonna appear
-fn paint_next_block(painter: &egui::Painter, block: &Option<Block>, at_pos: &Pos2) {
+fn paint_next_block(painter: &egui::Painter, block: &Option<Block>, at_pos: &egui::Pos2) {
     if let Some(block) = block {
         let half_block_width = CELL_SIZE * (block.width() as f32) / 2.0;
         block.config().for_each(|&coord| {
@@ -200,7 +227,7 @@ fn paint_next_block(painter: &egui::Painter, block: &Option<Block>, at_pos: &Pos
 // Paint one cell
 fn paint_coord(painter: &egui::Painter, coord: Coord, color: &Color32) {
     painter.rect(
-        CELL.translate(Vec2::new(coord.0 as f32, coord.1 as f32)),
+        CELL.translate(egui::Vec2::new(coord.0 as f32, coord.1 as f32)),
         ROUNDING,
         *color,
         STROKE,
@@ -221,7 +248,9 @@ fn color_from_id(id: &BlockID) -> &Color32 {
 }
 
 // Setup context styles
-fn setup_context(ctx: &Context) {
+fn setup_context(ctx: &egui::Context) {
+    use egui::{TextStyle, FontId, FontFamily};
+
     // Change font sizes
     let mut style = (*ctx.style()).clone();
     style.text_styles = [
