@@ -5,6 +5,7 @@ mod enums;
 mod block;
 mod tetris;
 mod scoreboard;
+mod timer;
 mod app;
 
 pub use tetris::Tetris;
@@ -44,12 +45,31 @@ pub fn start_native(canvas_id: &str, width: i32, height: i32) -> Result<(), efra
 // WASM //
 //////////
 
+#[cfg(target_arch = "wasm32")]
+use eframe::wasm_bindgen::{self, prelude::*};
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub struct WebHandle {
+    handle: eframe::web::AppRunnerRef,
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+impl WebHandle {
+    #[wasm_bindgen]
+    pub fn stop_web(&self) -> Result<(), wasm_bindgen::JsValue> {
+        let mut app = self.handle.lock();
+        app.destroy()
+    }
+}
+
 /// This is the entry-point for all the web-assembly.
 /// This is called once from the HTML.
 /// It loads the app, installs some callbacks, then returns.
 /// You can add more callbacks like this if you want to call in to your code.
 #[cfg(target_arch = "wasm32")]
-pub async fn start_web(canvas_id: &str, width: i32, height: i32) -> Result<eframe::web::AppRunnerRef, eframe::wasm_bindgen::JsValue> {
+pub async fn start_web(canvas_id: &str, width: i32, height: i32) -> Result<WebHandle, wasm_bindgen::JsValue> {
     // Make sure panics are logged using `console.error`.
     console_error_panic_hook::set_once();
 
@@ -64,4 +84,5 @@ pub async fn start_web(canvas_id: &str, width: i32, height: i32) -> Result<efram
         Box::new(move |cc| Box::new(app::TetrisApp::new(cc, width, height))),
     )
     .await
+    .map(|handle| WebHandle { handle })
 }

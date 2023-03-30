@@ -1,8 +1,8 @@
 const SCORE_0_LINE: usize = 0;
-const SCORE_1_LINE: usize = 1;
-const SCORE_2_LINE: usize = 3;
-const SCORE_3_LINE: usize = 7;
-const SCORE_4_LINE: usize = 13;
+const SCORE_1_LINE: usize = 11;
+const SCORE_2_LINE: usize = 29;
+const SCORE_3_LINE: usize = 67;
+const SCORE_4_LINE: usize = 103;
 
 pub struct Scoreboard {
     score: usize,
