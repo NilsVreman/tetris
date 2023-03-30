@@ -1,5 +1,5 @@
 # tetris
-Tetris implemented in Rust
+Tetris implemented in Rust for both Native and WASM. Play it [here](https://NilsVreman.github.io/tetris/).
 
 The app is written in Rust using [egui](https://github.com/emilk/egui/) and [eframe](https://github.com/emilk/egui/tree/master/crates/eframe).
 
