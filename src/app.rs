@@ -3,13 +3,10 @@ use super::tetris::Tetris;
 use super::block::Block;
 use super::scoreboard::Scoreboard;
 use super::timer::TickTimer;
-use super::enums::{ShiftCmd, RotateCmd, BlockID};
+use super::enums::{ShiftCmd, RotateCmd, BlockID, GameStatus};
 
 use eframe;
 use egui::*;
-
-#[cfg(not(target_arch = "wasm32"))]
-use super::enums::GameStatus;
 
 // ------------------------------------------------------------------------------------------------
 // Game constants
@@ -70,18 +67,14 @@ impl TetrisApp {
     pub fn handle_user_input(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
         // Close
         #[cfg(not(target_arch = "wasm32"))]
-        if ctx.input(|i| i.key_pressed(Key::Escape) || i.key_pressed(Key::Q))
-            || self.game.status() == GameStatus::GameOver
-        {
+        if ctx.input(|i| i.key_pressed(Key::Escape) || i.key_pressed(Key::Q)) {
             _frame.close();
         }
 
         // User Commands
         if ctx.input(|i| i.key_pressed(Key::Space)) {
-            if let Some(num_cleared) = self.game.hard_drop() {
-                // Send how many lines were cleared to the scoreboard
-                self.scoreboard.update_score(num_cleared);
-                self.timer.update_period_from_score(self.scoreboard.get_score());
+            if let Some(num_lines_cleared) = self.game.hard_drop() {
+                self.update_score_and_tickrate(num_lines_cleared);
             }
         }
         if ctx.input(|i| i.key_pressed(Key::H) || i.key_pressed(Key::ArrowLeft))  { self.game.shift_block_if_feasible(&ShiftCmd::Left); }
@@ -92,9 +85,21 @@ impl TetrisApp {
 
     pub fn tick(&mut self) {
         if self.timer.get_time_until_tick() <= 0 {
-            self.game.tick();
+            if let Some(num_lines_cleared) = self.game.tick() {
+                self.update_score_and_tickrate(num_lines_cleared);
+            }
             self.timer.reset_tick();
         }
+    }
+
+    pub fn game_status(&self) -> GameStatus {
+        self.game.status()
+    }
+
+    // Send how many lines were cleared to the scoreboard
+    fn update_score_and_tickrate(&mut self, num_lines_cleared: usize) {
+        self.scoreboard.update_score(num_lines_cleared);
+        self.timer.update_period_from_score(self.scoreboard.get_score());
     }
 
     // Paint the state config of the tetris game
@@ -115,6 +120,15 @@ impl TetrisApp {
 
 impl eframe::App for TetrisApp {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
+
+        // If GameOver
+        if let GameStatus::GameOver = self.game_status() {
+            #[cfg(not(target_arch = "wasm32"))]
+            _frame.close();
+
+            //#[cfg(target_arch = "wasm32")]
+            // TODO: Add functionality for GameOver in WASM //
+        }
 
         // Alter tetris state based on user input
         self.handle_user_input(&ctx, _frame);
