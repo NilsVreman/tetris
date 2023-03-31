@@ -20,7 +20,7 @@ impl Tetris {
 
         // Walls on the outside of the tetris court
         let mut boundary: HashSet<Coord> = HashSet::with_capacity((height*2 + width + 2) as usize);
-        for i in 0..=height {
+        for i in -2..=height {
             boundary.insert(Coord(0, i));
             boundary.insert(Coord(width+1, i));
         }

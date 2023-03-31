@@ -31,7 +31,7 @@ const COLOR_Z: Color32 = Color32::from_rgb(200, 200, 200);
 
 const START_PERIOD: i64 = 1024;
 const MIN_PERIOD: i64 = 32;
-const LVL_UP: i64 = 1000;
+const LVL_UP: i64 = 500;
 
 // ------------------------------------------------------------------------------------------------
 // Main application
