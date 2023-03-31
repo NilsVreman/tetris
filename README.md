@@ -34,13 +34,18 @@ Tetris:      103 p
 
 
 ## TODO:
-* Mention installation process:
+* Description of installation process
     1. sudo dnf ...
     2. .cargo file and that it is appended to cargo commands
     3. #dev thingy
     4. how to host it locally
     5. How to run in natively.
     6. other?
+* Features:
+    1. gui scaling to window
+    2. hard drop shadow.
+    3. key for temporary increase of movement speed downwards
+    4. break out gui features into own library
 
 
 ## Compilation - Local
